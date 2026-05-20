@@ -1,4 +1,4 @@
-Cluster IP:
+loadbalancer:
 
  vi deployhttpd1.yml
 

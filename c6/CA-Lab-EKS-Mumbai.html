@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cluster Autoscaler Lab — EKS Mumbai</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --blue: #3b82f6;
+    --blue-dim: #1d4ed8;
+    --cyan: #06b6d4;
+    --green: #10b981;
+    --green-dim: #065f46;
+    --orange: #f59e0b;
+    --orange-dim: #78350f;
+    --red: #ef4444;
+    --red-dim: #7f1d1d;
+    --purple: #a855f7;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --text-dimmer: #475569;
+    --code-bg: #0d1117;
+    --code-text: #e6edf3;
+    --comment: #6e7681;
+    --accent: #06b6d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    background: linear-gradient(135deg, #0f172a 0%, #0a1628 50%, #0d1b2a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 60px 40px 50px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: 5%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-inner { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+  .hero-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3);
+    color: var(--cyan); font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; padding: 4px 12px; border-radius: 4px; margin-bottom: 20px;
+    letter-spacing: 0.05em;
+  }
+  .hero h1 {
+    font-family: 'Syne', sans-serif; font-size: 52px; font-weight: 800;
+    line-height: 1.1; margin-bottom: 16px;
+    background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero h1 span {
+    background: linear-gradient(135deg, #06b6d4, #3b82f6);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero-sub {
+    color: var(--text-dim); font-size: 17px; max-width: 600px; margin-bottom: 32px;
+  }
+  .hero-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); font-size: 13px; padding: 6px 14px; border-radius: 6px;
+  }
+  .chip span { color: var(--text); font-weight: 600; }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+
+  /* ── SECTION BANNER ── */
+  .section-banner {
+    padding: 50px 40px 0;
+  }
+  .section-banner-inner {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: center; gap: 16px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .section-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .section-title { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 700; }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--text-dimmer); margin-bottom: 2px;
+  }
+
+  /* ── CONTENT BLOCK ── */
+  .content-block { padding: 0 40px 40px; }
+  .content-inner { max-width: 1100px; margin: 0 auto; }
+
+  /* ── STEP ── */
+  .step {
+    margin-bottom: 40px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .step-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .step-num {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--blue-dim); color: white;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .step-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .step-body { padding: 20px; background: var(--bg); }
+
+  /* ── CODE BLOCK ── */
+  .code-wrap {
+    background: var(--code-bg);
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 14px 0;
+  }
+  .code-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 16px;
+    background: #161b22;
+    border-bottom: 1px solid #21262d;
+  }
+  .code-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: #6e7681; letter-spacing: 0.05em;
+  }
+  .copy-btn {
+    background: none; border: 1px solid #30363d; color: #8b949e;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 3px 10px; border-radius: 4px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { border-color: var(--blue); color: var(--blue); }
+  pre {
+    padding: 18px 20px; overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    line-height: 1.7; color: var(--code-text);
+  }
+  .cm { color: var(--comment); }
+  .ck { color: #79c0ff; }
+  .cv { color: #a5d6ff; }
+  .cs { color: #a8d8a8; }
+  .cn { color: #f0883e; }
+  .cp { color: #d2a8ff; }
+
+  /* ── MANIFEST EXPLAINER ── */
+  .manifest-block {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 14px 0;
+  }
+  .manifest-code {
+    background: var(--code-bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .manifest-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+  }
+  .manifest-table th {
+    background: var(--surface2);
+    padding: 10px 16px;
+    text-align: left;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+  }
+  .manifest-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    font-size: 13.5px;
+  }
+  .manifest-table tr:last-child td { border-bottom: none; }
+  .manifest-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .key-cell {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px; color: #79c0ff;
+    white-space: nowrap; padding-right: 20px;
+    width: 220px;
+  }
+  .val-cell { color: #a5d6ff; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .desc-cell { color: var(--text-dim); line-height: 1.5; }
+
+  /* ── ALERT BOXES ── */
+  .alert {
+    border-radius: 8px; padding: 14px 18px; margin: 14px 0;
+    border-left: 3px solid; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .alert-body { flex: 1; }
+  .alert-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .alert-text { font-size: 13.5px; line-height: 1.6; }
+  .alert.tip { background: rgba(6,182,212,0.08); border-color: var(--cyan); }
+  .alert.tip .alert-title { color: var(--cyan); }
+  .alert.warn { background: rgba(245,158,11,0.08); border-color: var(--orange); }
+  .alert.warn .alert-title { color: var(--orange); }
+  .alert.danger { background: rgba(239,68,68,0.08); border-color: var(--red); }
+  .alert.danger .alert-title { color: var(--red); }
+  .alert.success { background: rgba(16,185,129,0.08); border-color: var(--green); }
+  .alert.success .alert-title { color: var(--green); }
+
+  /* ── TABLE ── */
+  .data-table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+  .data-table th {
+    background: rgba(59,130,246,0.15); color: var(--blue);
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    padding: 10px 14px; text-align: left;
+    border: 1px solid rgba(59,130,246,0.2);
+  }
+  .data-table td {
+    padding: 10px 14px; border: 1px solid var(--border);
+    font-size: 13.5px; color: var(--text-dim); vertical-align: top;
+  }
+  .data-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .data-table td:first-child { color: var(--text); font-weight: 500; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #79c0ff; }
+
+  /* ── INLINE CODE ── */
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+    background: rgba(6,182,212,0.1); color: var(--cyan);
+    padding: 2px 6px; border-radius: 4px;
+  }
+
+  /* ── NAV ── */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 40px 0;
+  }
+  .toc-title {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px;
+    color: var(--text-dim); margin-bottom: 12px; text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .toc-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+  .toc-list a {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); text-decoration: none; font-size: 13px;
+    padding: 5px 12px; border-radius: 6px; transition: all 0.2s;
+  }
+  .toc-list a:hover { border-color: var(--blue); color: var(--text); }
+
+  p { margin-bottom: 12px; color: var(--text-dim); line-height: 1.7; }
+  h3 { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+    color: var(--text); margin: 20px 0 10px; }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  .footer {
+    margin-top: 60px; padding: 30px 40px;
+    border-top: 1px solid var(--border);
+    text-align: center; color: var(--text-dimmer); font-size: 13px;
+  }
+
+  /* flow diagram */
+  .flow {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0;
+    margin: 16px 0;
+  }
+  .flow-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 16px; font-size: 13px;
+    color: var(--text); text-align: center;
+  }
+  .flow-arrow {
+    color: var(--cyan); font-size: 20px; padding: 0 8px;
+  }
+
+  /* error vs fix table */
+  .fix-table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+  .fix-table th {
+    padding: 10px 14px; font-family: 'Syne', sans-serif; font-size: 13px;
+    font-weight: 700; text-align: left; border-bottom: 2px solid var(--border);
+  }
+  .fix-table td {
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+    font-size: 13.5px; vertical-align: top;
+  }
+  .fix-table tr:last-child td { border-bottom: none; }
+  .err-col { color: var(--red); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .fix-col { color: var(--green); }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-tag">☁️ EKS · ap-south-1 · Mumbai</div>
+    <h1>Cluster <span>Autoscaler</span><br>Hands-On Lab</h1>
+    <p class="hero-sub">Auto-add and remove EC2 nodes based on pod demand. Includes IAM setup, ASG tagging, manifest explanations, and all real-world fixes.</p>
+    <div class="hero-chips">
+      <div class="chip">⏱️ Duration: <span>~25 min</span></div>
+      <div class="chip">🎯 Goal: <span>Scale-Up &amp; Scale-Down demo</span></div>
+      <div class="chip">🔧 Fixes: <span>IAM · Region · ASG Tags · Cluster Name</span></div>
+      <div class="chip">📦 Cluster: <span>autoscale-lab / my-eks-cluster</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOC -->
+<div class="content-block" style="padding-top:40px;">
+  <div class="content-inner">
+    <div class="toc">
+      <div class="toc-title">Table of Contents</div>
+      <ul class="toc-list">
+        <li><a href="#how-ca-works">💡 How CA Works</a></li>
+        <li><a href="#iam">🔐 Step 1 — IAM Permissions</a></li>
+        <li><a href="#region">🌏 Step 2 — Set Region</a></li>
+        <li><a href="#asg">🏷️ Step 3 — Find &amp; Tag ASG</a></li>
+        <li><a href="#deploy-ca">🚀 Step 4 — Deploy CA</a></li>
+        <li><a href="#configure">⚙️ Step 5 — Configure CA</a></li>
+        <li><a href="#verify">✅ Step 6 — Verify Running</a></li>
+        <li><a href="#scale-up">📈 Step 7 — Trigger Scale-Up</a></li>
+        <li><a href="#scale-down">📉 Step 8 — Trigger Scale-Down</a></li>
+        <li><a href="#troubleshoot">🔧 Troubleshooting</a></li>
+        <li><a href="#cleanup">🧹 Cleanup</a></li>
+        <li><a href="#interview">🎓 Interview Q&amp;A</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- HOW CA WORKS -->
+<div id="how-ca-works" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(6,182,212,0.15);">💡</div>
+    <div>
+      <div class="section-num">CONCEPT</div>
+      <div class="section-title">How Cluster Autoscaler Works</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <p>Cluster Autoscaler watches for pods that cannot be scheduled (Pending state) and nodes that are consistently underutilised. It adds or removes EC2 nodes accordingly — automatically.</p>
+
+    <h3>Scale-Up Flow</h3>
+    <div class="flow">
+      <div class="flow-box">Pod created</div><div class="flow-arrow">→</div>
+      <div class="flow-box">No space on nodes<br><small style="color:var(--red)">Pending state</small></div><div class="flow-arrow">→</div>
+      <div class="flow-box">CA detects Pending<br><small style="color:var(--text-dim)">within 30s</small></div><div class="flow-arrow">→</div>
+      <div class="flow-box">CA calls AWS ASG<br><small style="color:var(--text-dim)">increase desired</small></div><div class="flow-arrow">→</div>
+      <div class="flow-box">New EC2 node joins<br><small style="color:var(--green)">~2-3 minutes</small></div>
+    </div>
+
+    <h3>Scale-Down Flow</h3>
+    <div class="flow">
+      <div class="flow-box">Pods deleted</div><div class="flow-arrow">→</div>
+      <div class="flow-box">Node becomes idle<br><small style="color:var(--text-dim)">&lt;50% utilised</small></div><div class="flow-arrow">→</div>
+      <div class="flow-box">CA waits 10 min<br><small style="color:var(--text-dim)">cool-down</small></div><div class="flow-arrow">→</div>
+      <div class="flow-box">CA drains node<br><small style="color:var(--text-dim)">moves pods</small></div><div class="flow-arrow">→</div>
+      <div class="flow-box">EC2 terminated<br><small style="color:var(--green)">cost saved</small></div>
+    </div>
+
+    <br>
+    <table class="data-table">
+      <tr><th>Situation</th><th>CA Action</th><th>Timing</th></tr>
+      <tr><td>Pod stuck in Pending</td><td>Adds new EC2 node via ASG</td><td>Detects in 30s, node ready in ~3 min</td></tr>
+      <tr><td>Node idle &lt;50% for 10 min</td><td>Drains pods, terminates node</td><td>10 min cool-down then ~2 min drain</td></tr>
+      <tr><td>All pods scheduled, nodes healthy</td><td>Does nothing</td><td>Polls every 10 seconds</td></tr>
+    </table>
+
+    <div class="alert tip">
+      <div class="alert-icon">💡</div>
+      <div class="alert-body">
+        <div class="alert-title">CA requires resource requests on pods</div>
+        <div class="alert-text">CA calculates node utilisation using <code>resources.requests</code> on pods. If pods have no requests, utilisation is always 0% and CA will never scale down. Always set CPU and memory requests on every container.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 1 — IAM -->
+<div id="iam" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(239,68,68,0.15);">🔐</div>
+    <div>
+      <div class="section-num">STEP 1 — CRITICAL FIRST</div>
+      <div class="section-title">IAM Permissions (Fix the #1 Error)</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+
+    <div class="alert danger">
+      <div class="alert-icon">🚨</div>
+      <div class="alert-body">
+        <div class="alert-title">Most Common Error — Do This BEFORE deploying CA</div>
+        <div class="alert-text">Without this step, CA crashes immediately with <code>AccessDenied: autoscaling:DescribeAutoScalingGroups</code>. The node's IAM role does not have permission to call AWS autoscaling APIs by default.</div>
+      </div>
+    </div>
+
+    <h3>The Error You Will See (if you skip this step)</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">CA CRASH LOG</span></div>
+      <pre><span style="color:var(--red)">E</span> aws_manager.go:128] Failed to regenerate ASG cache: AccessDenied:
+  User: arn:aws:sts::386757865964:assumed-role/<span style="color:var(--orange)">eksctl-my-eks-cluster-nodegroup-st-NodeInstanceRole-wgOYaObz1jHu</span>/i-0385...
+  is not authorized to perform: <span style="color:var(--red)">autoscaling:DescribeAutoScalingGroups</span>
+  because no identity-based policy allows the action</pre>
+    </div>
+
+    <h3>Step 1A — Find Your Node Instance Role Name</h3>
+    <p>The role name is visible in the error above, or run this command:</p>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Get the node instance role name from your nodegroup</span>
+aws eks describe-nodegroup \
+  --cluster-name my-eks-cluster \
+  --nodegroup-name standard-workers \
+  --region ap-south-1 \
+  --query 'nodegroup.nodeRole' \
+  --output text</pre>
+    </div>
+
+    <div class="alert tip">
+      <div class="alert-icon">💡</div>
+      <div class="alert-body">
+        <div class="alert-title">How to find your nodegroup name</div>
+        <div class="alert-text"><code>aws eks list-nodegroups --cluster-name my-eks-cluster --region ap-south-1</code></div>
+      </div>
+    </div>
+
+    <h3>Step 1B — Attach the Required Policy</h3>
+    <p>Replace the role name with your actual role from Step 1A:</p>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Attach AutoScaling permissions to the node IAM role</span>
+aws iam attach-role-policy \
+  --region ap-south-1 \
+  --role-name <span style="color:var(--orange)">eksctl-my-eks-cluster-nodegroup-st-NodeInstanceRole-wgOYaObz1jHu</span> \
+  --policy-arn arn:aws:iam::aws:policy/AutoScalingFullAccess</pre>
+    </div>
+
+    <h3>What permissions does CA need?</h3>
+    <table class="data-table">
+      <tr><th>AWS API Permission</th><th>Why CA Needs It</th></tr>
+      <tr><td class="mono">autoscaling:DescribeAutoScalingGroups</td><td>Discover which ASGs exist and their current size/state</td></tr>
+      <tr><td class="mono">autoscaling:SetDesiredCapacity</td><td>Tell the ASG to add more nodes (scale up)</td></tr>
+      <tr><td class="mono">autoscaling:TerminateInstanceInAutoScalingGroup</td><td>Remove a specific node (scale down)</td></tr>
+      <tr><td class="mono">ec2:DescribeLaunchTemplateVersions</td><td>Know the instance type to simulate scheduling decisions</td></tr>
+    </table>
+
+    <div class="alert success">
+      <div class="alert-icon">✅</div>
+      <div class="alert-body">
+        <div class="alert-title">Verification</div>
+        <div class="alert-text"><code>aws iam list-attached-role-policies --role-name &lt;your-role&gt; --region ap-south-1</code> — should now show AutoScalingFullAccess in the list.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2 — REGION -->
+<div id="region" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(16,185,129,0.15);">🌏</div>
+    <div>
+      <div class="section-num">STEP 2</div>
+      <div class="section-title">Set Region and Cluster Variables</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <p>Your EKS cluster is in Mumbai. Set these variables now — all subsequent commands use them.</p>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Set once — valid for your entire terminal session</span>
+export AWS_DEFAULT_REGION=ap-south-1
+export CLUSTER_NAME=my-eks-cluster
+
+<span class="cm"># Verify cluster is accessible</span>
+kubectl get nodes
+<span class="cm"># Expected: 2 nodes with STATUS = Ready</span></pre>
+    </div>
+    <div class="alert warn">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-body">
+        <div class="alert-title">Default region is us-east-1</div>
+        <div class="alert-text">The CA manifest defaults to <code>us-east-1</code>. If you skip this, CA will look for ASGs in the wrong region and find nothing. Always set <code>AWS_DEFAULT_REGION=ap-south-1</code> first.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3 — ASG -->
+<div id="asg" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(245,158,11,0.15);">🏷️</div>
+    <div>
+      <div class="section-num">STEP 3</div>
+      <div class="section-title">Find and Tag Your Auto Scaling Group</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <p>CA discovers which ASG to manage using two specific AWS tags. First find the ASG name, then add the tags.</p>
+
+    <h3>3A — Find ASG Name</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># List all ASGs in Mumbai</span>
+aws autoscaling describe-auto-scaling-groups \
+  --region ap-south-1 \
+  --query 'AutoScalingGroups[*].AutoScalingGroupName' \
+  --output text
+
+<span class="cm"># Save the output as a variable (replace the name below)</span>
+ASG_NAME=eks-standard-workers-4ecf26bb-3d18-100c-e84a-806e585bc33c
+echo $ASG_NAME</pre>
+    </div>
+
+    <h3>3B — Tag the ASG</h3>
+    <div class="alert danger">
+      <div class="alert-icon">🚨</div>
+      <div class="alert-body">
+        <div class="alert-title">Wrap each tag in double quotes — this is mandatory</div>
+        <div class="alert-text">Without quotes you get: <code>Expected: '=' received: ' '</code>. Each tag entry must be a single quoted string.</div>
+      </div>
+    </div>
+
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Tag the ASG — double quotes around EACH tag (critical!)</span>
+aws autoscaling create-or-update-tags \
+  --region ap-south-1 \
+  --tags \
+  <span style="color:var(--green)">"ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=k8s.io/cluster-autoscaler/enabled,Value=true,PropagateAtLaunch=false"</span> \
+  <span style="color:var(--green)">"ResourceId=${ASG_NAME},ResourceType=auto-scaling-group,Key=k8s.io/cluster-autoscaler/${CLUSTER_NAME},Value=owned,PropagateAtLaunch=false"</span></pre>
+    </div>
+
+    <h3>Why these specific tags?</h3>
+    <table class="data-table">
+      <tr><th>Tag Key</th><th>Value</th><th>Purpose</th></tr>
+      <tr><td class="mono">k8s.io/cluster-autoscaler/enabled</td><td><code>true</code></td><td>Tells CA this ASG is eligible to be managed</td></tr>
+      <tr><td class="mono">k8s.io/cluster-autoscaler/my-eks-cluster</td><td><code>owned</code></td><td>Scopes CA to only manage ASGs for this specific cluster — prevents CA from touching other clusters' ASGs</td></tr>
+      <tr><td class="mono">PropagateAtLaunch=false</td><td>—</td><td>Don't copy this tag onto individual EC2 instances, only on the ASG itself</td></tr>
+    </table>
+
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH — VERIFY</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Confirm tags were applied</span>
+aws autoscaling describe-auto-scaling-groups \
+  --region ap-south-1 \
+  --auto-scaling-group-names ${ASG_NAME} \
+  --query 'AutoScalingGroups[0].Tags[*].Key' \
+  --output text
+<span class="cm"># Should show both tag keys</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4 — DEPLOY CA -->
+<div id="deploy-ca" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(59,130,246,0.15);">🚀</div>
+    <div>
+      <div class="section-num">STEP 4</div>
+      <div class="section-title">Deploy Cluster Autoscaler</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+
+<span class="cm"># Confirm CA pod was created</span>
+kubectl get pods -n kube-system | grep cluster-autoscaler</pre>
+    </div>
+
+    <p>This manifest creates: a ServiceAccount, ClusterRole, ClusterRoleBinding, Role, RoleBinding, and the CA Deployment. The pod will initially show <code>CrashLoopBackOff</code> — that is expected until we configure the region and cluster name in Step 5.</p>
+  </div>
+</div>
+
+<!-- STEP 5 — CONFIGURE -->
+<div id="configure" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(168,85,247,0.15);">⚙️</div>
+    <div>
+      <div class="section-num">STEP 5</div>
+      <div class="section-title">Configure Region and Cluster Name</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <p>The downloaded manifest has <code>us-east-1</code> and <code>&lt;YOUR CLUSTER NAME&gt;</code> as placeholders. Fix both using <code>kubectl patch</code> — no editor needed.</p>
+
+    <h3>Fix 1 — Set Correct Region</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre>kubectl -n kube-system set env deployment/cluster-autoscaler \
+  AWS_REGION=ap-south-1</pre>
+    </div>
+
+    <h3>Fix 2 — Find the Cluster Name Argument Index</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Print all CA arguments with their index (0-based)</span>
+kubectl -n kube-system get deployment cluster-autoscaler \
+  -o jsonpath='{.spec.template.spec.containers[0].command}' | tr ',' '\n'
+
+<span class="cm"># Output will look like:</span>
+<span class="cm"># [0] "./cluster-autoscaler"</span>
+<span class="cm"># [1] "--v=4"</span>
+<span class="cm"># [2] "--stderrthreshold=info"</span>
+<span class="cm"># [3] "--cloud-provider=aws"</span>
+<span class="cm"># [4] "--skip-nodes-with-local-storage=false"</span>
+<span class="cm"># [5] "--expander=least-waste"</span>
+<span class="cm"># [6] "--node-group-auto-discovery=...&lt;YOUR CLUSTER NAME&gt;"  ← this is index 6</span></pre>
+    </div>
+
+    <h3>Fix 3 — Patch Cluster Name (no editor needed)</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Replace index 6 with your actual cluster name</span>
+kubectl -n kube-system patch deployment cluster-autoscaler \
+  --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/command/6","value":"--node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/my-eks-cluster"}]'</pre>
+    </div>
+
+    <div class="alert warn">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-body">
+        <div class="alert-title">If you get "index out of range"</div>
+        <div class="alert-text">Count the lines from the jsonpath output above. Find which line contains <code>&lt;YOUR CLUSTER NAME&gt;</code> and replace <code>/6</code> with the correct index number.</div>
+      </div>
+    </div>
+
+    <h3>Verify Both Fixes</h3>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre>kubectl -n kube-system get deployment cluster-autoscaler \
+  -o jsonpath='{.spec.template.spec.containers[0].command}' | tr ',' '\n'
+<span class="cm"># Should now show: my-eks-cluster (not YOUR CLUSTER NAME)</span>
+<span class="cm"># And env should show: AWS_REGION=ap-south-1</span></pre>
+    </div>
+
+    <br>
+    <h3>CA Deployment Manifest — Key Fields Explained</h3>
+    <div class="manifest-block">
+      <div class="code-wrap" style="margin:0;border-radius:0;border:none;border-bottom:1px solid var(--border);">
+        <pre style="font-size:12px;"><span class="ck">--cloud-provider</span>=<span class="cs">aws</span>
+<span class="ck">--skip-nodes-with-local-storage</span>=<span class="cs">false</span>
+<span class="ck">--expander</span>=<span class="cs">least-waste</span>
+<span class="ck">--node-group-auto-discovery</span>=<span class="cs">asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/my-eks-cluster</span></pre>
+      </div>
+      <table class="manifest-table">
+        <tr><th>Argument</th><th>Value</th><th>What It Means</th></tr>
+        <tr>
+          <td class="key-cell">--cloud-provider</td>
+          <td class="val-cell">aws</td>
+          <td class="desc-cell">Tells CA which cloud it is running on. It uses AWS-specific APIs (ASG, EC2) to add/remove nodes.</td>
+        </tr>
+        <tr>
+          <td class="key-cell">--skip-nodes-with-local-storage</td>
+          <td class="val-cell">false</td>
+          <td class="desc-cell">By default CA will NOT remove a node that has pods using local storage (emptyDir, hostPath). Setting false means CA CAN remove such nodes — useful in labs but be careful in production.</td>
+        </tr>
+        <tr>
+          <td class="key-cell">--expander</td>
+          <td class="val-cell">least-waste</td>
+          <td class="desc-cell">When CA needs to pick which node group to scale up, it uses this strategy. <code>least-waste</code> picks the group that results in the least unused CPU/memory — most cost-efficient. Other options: <code>random</code>, <code>most-pods</code>, <code>priority</code>.</td>
+        </tr>
+        <tr>
+          <td class="key-cell">--node-group-auto-discovery</td>
+          <td class="val-cell">asg:tag=...</td>
+          <td class="desc-cell">Tells CA how to find which ASGs to manage — by looking for ASGs that have both discovery tags. The format is <code>asg:tag=key1,key2</code>. CA calls <code>DescribeAutoScalingGroups</code> to find matching ASGs.</td>
+        </tr>
+        <tr>
+          <td class="key-cell">--v=4</td>
+          <td class="val-cell">4</td>
+          <td class="desc-cell">Log verbosity level. 4 = detailed logs including scaling decisions. Useful for debugging. Set to 1 or 2 in production to reduce log noise.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 6 — VERIFY -->
+<div id="verify" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(16,185,129,0.15);">✅</div>
+    <div>
+      <div class="section-num">STEP 6</div>
+      <div class="section-title">Verify CA is Running</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Wait for CA pod to be Running</span>
+kubectl rollout status deployment/cluster-autoscaler -n kube-system
+
+<span class="cm"># Check CA logs for good startup messages</span>
+kubectl -n kube-system logs deployment/cluster-autoscaler --tail=20</pre>
+    </div>
+
+    <h3>Good logs vs Bad logs</h3>
+    <table class="fix-table">
+      <tr>
+        <th style="color:var(--green);width:50%">✅ Good — CA is working</th>
+        <th style="color:var(--red);width:50%">❌ Bad — something is wrong</th>
+      </tr>
+      <tr>
+        <td><code style="color:var(--green);font-size:12px">Found 1 node group(s)</code></td>
+        <td><code style="color:var(--red);font-size:12px">AccessDenied: autoscaling:DescribeAutoScalingGroups</code></td>
+      </tr>
+      <tr>
+        <td><code style="color:var(--green);font-size:12px">Refreshed ASG list</code></td>
+        <td><code style="color:var(--red);font-size:12px">No node groups found</code></td>
+      </tr>
+      <tr>
+        <td><code style="color:var(--green);font-size:12px">Starting main loop</code></td>
+        <td><code style="color:var(--red);font-size:12px">Failed to create AWS Manager</code></td>
+      </tr>
+      <tr>
+        <td><code style="color:var(--green);font-size:12px">Cluster-autoscaler run successfully</code></td>
+        <td><code style="color:var(--red);font-size:12px">CrashLoopBackOff</code></td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- STEP 7 — SCALE UP -->
+<div id="scale-up" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(59,130,246,0.15);">📈</div>
+    <div>
+      <div class="section-num">STEP 7</div>
+      <div class="section-title">Trigger Scale-Up</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <p>Deploy 10 pods each requesting <code>500m CPU</code> and <code>512Mi memory</code>. Your 2-node cluster cannot fit all of them — some enter Pending state, which triggers CA to add a node.</p>
+
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">ca-test.yaml</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre>cat &lt;&lt;EOF | kubectl apply -f -
+<span class="ck">apiVersion</span>: <span class="cs">apps/v1</span>
+<span class="ck">kind</span>: <span class="cs">Deployment</span>
+<span class="ck">metadata</span>:
+  <span class="ck">name</span>: <span class="cs">ca-test</span>
+<span class="ck">spec</span>:
+  <span class="ck">replicas</span>: <span class="cn">10</span>
+  <span class="ck">selector</span>:
+    <span class="ck">matchLabels</span>:
+      <span class="ck">app</span>: <span class="cs">ca-test</span>
+  <span class="ck">template</span>:
+    <span class="ck">metadata</span>:
+      <span class="ck">labels</span>:
+        <span class="ck">app</span>: <span class="cs">ca-test</span>
+    <span class="ck">spec</span>:
+      <span class="ck">containers</span>:
+      - <span class="ck">name</span>: <span class="cs">app</span>
+        <span class="ck">image</span>: <span class="cs">registry.k8s.io/pause:3.1</span>
+        <span class="ck">resources</span>:
+          <span class="ck">requests</span>:
+            <span class="ck">cpu</span>: <span class="cs">500m</span>
+            <span class="ck">memory</span>: <span class="cs">512Mi</span>
+EOF</pre>
+    </div>
+
+    <h3>Manifest Fields Explained</h3>
+    <table class="manifest-table" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <tr><th>Field</th><th>Value</th><th>Explanation</th></tr>
+      <tr>
+        <td class="key-cell">replicas</td>
+        <td class="val-cell">10</td>
+        <td class="desc-cell">Create 10 identical pod copies. With 2 t3.medium nodes (~2 vCPU, 4Gi each), only ~6 pods can fit. The remaining ~4 pods will be Pending — this is what triggers CA.</td>
+      </tr>
+      <tr>
+        <td class="key-cell">image: pause:3.1</td>
+        <td class="val-cell">—</td>
+        <td class="desc-cell">The <code>pause</code> container does absolutely nothing — it just sleeps. Perfect for testing scheduling and scaling without actually doing any work. Tiny image, starts instantly.</td>
+      </tr>
+      <tr>
+        <td class="key-cell">resources.requests.cpu</td>
+        <td class="val-cell">500m</td>
+        <td class="desc-cell"><code>500m</code> = 0.5 vCPU. This is what Kubernetes reserves on the node for this pod. t3.medium has 2 vCPU so it can fit about 3 pods on CPU alone (minus system overhead).</td>
+      </tr>
+      <tr>
+        <td class="key-cell">resources.requests.memory</td>
+        <td class="val-cell">512Mi</td>
+        <td class="desc-cell">512 Mebibytes reserved per pod. t3.medium has 4Gi (~4096Mi) so can fit about 6 pods on memory alone (minus system). The combination of CPU + memory determines real capacity.</td>
+      </tr>
+      <tr>
+        <td class="key-cell">selector.matchLabels</td>
+        <td class="val-cell">app: ca-test</td>
+        <td class="desc-cell">The Deployment uses this label to find which pods it owns. Must match the labels in the pod template. If these differ, the Deployment cannot manage the pods.</td>
+      </tr>
+    </table>
+
+    <br>
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH — WATCH SCALE-UP</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Terminal 1 — watch pods (some will be Pending initially)</span>
+kubectl get pods -l app=ca-test
+
+<span class="cm"># Terminal 2 — watch nodes (new node appears in ~3 minutes)</span>
+kubectl get nodes --watch
+
+<span class="cm"># Terminal 3 — watch CA logs for scaling decision</span>
+kubectl -n kube-system logs deployment/cluster-autoscaler -f | grep -i scale
+
+<span class="cm"># Look for:</span>
+<span class="cm"># "Scale up: adding 1 node to group"</span>
+<span class="cm"># "Successfully added node"</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 8 — SCALE DOWN -->
+<div id="scale-down" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(16,185,129,0.15);">📉</div>
+    <div>
+      <div class="section-num">STEP 8</div>
+      <div class="section-title">Trigger Scale-Down</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># Delete the deployment — nodes become idle</span>
+kubectl delete deployment ca-test
+
+<span class="cm"># CA will wait the cool-down period (~10 min default) then remove idle nodes</span>
+kubectl get nodes --watch
+
+<span class="cm"># Watch scale-down in CA logs</span>
+kubectl -n kube-system logs deployment/cluster-autoscaler -f | grep -i 'scale down'
+
+<span class="cm"># Look for:</span>
+<span class="cm"># "Scale down: removing node"</span>
+<span class="cm"># "node removed by cluster autoscaler"</span></pre>
+    </div>
+
+    <div class="alert tip">
+      <div class="alert-icon">💡</div>
+      <div class="alert-body">
+        <div class="alert-title">Why does scale-down take 10 minutes?</div>
+        <div class="alert-text">Scale-down is intentionally slow to avoid thrashing — rapidly adding and removing nodes if traffic is spiky. The 10-minute window (<code>--scale-down-unneeded-time</code>) ensures a node is consistently idle before being removed. Scale-up is fast because adding capacity is always safe; scale-down removes capacity so CA is more cautious.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TROUBLESHOOTING -->
+<div id="troubleshoot" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(245,158,11,0.15);">🔧</div>
+    <div>
+      <div class="section-num">REFERENCE</div>
+      <div class="section-title">Troubleshooting — All Real Errors We Hit</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <table class="data-table">
+      <tr><th>Error</th><th>Root Cause</th><th>Fix</th></tr>
+      <tr>
+        <td><code>AccessDenied: autoscaling:DescribeAutoScalingGroups</code></td>
+        <td>Node IAM role missing autoscaling permissions</td>
+        <td><code>aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AutoScalingFullAccess</code></td>
+      </tr>
+      <tr>
+        <td><code>No node groups found</code></td>
+        <td>ASG tags missing or wrong cluster name in --node-group-auto-discovery</td>
+        <td>Re-tag ASG with correct cluster name. Patch CA deployment with correct cluster name.</td>
+      </tr>
+      <tr>
+        <td><code>Expected: '=' received: ' '</code></td>
+        <td>ASG tags not wrapped in double quotes</td>
+        <td>Wrap each tag string in <code>"..."</code> double quotes</td>
+      </tr>
+      <tr>
+        <td><code>ASG not found</code> when tagging</td>
+        <td>Wrong AWS region — ASG is in Mumbai but command used us-east-1</td>
+        <td>Add <code>--region ap-south-1</code> to every AWS CLI command</td>
+      </tr>
+      <tr>
+        <td>CA never scales down</td>
+        <td>Pods have no resource requests — utilisation always 0%</td>
+        <td>Add <code>resources.requests.cpu</code> and <code>resources.requests.memory</code> to all pods</td>
+      </tr>
+      <tr>
+        <td>Pending pods not scheduling after new node joins</td>
+        <td>Node not Ready yet or taint on new node</td>
+        <td>Wait 2-3 minutes. Check <code>kubectl describe node &lt;new-node&gt;</code> for taints.</td>
+      </tr>
+      <tr>
+        <td><code>patch index out of range</code></td>
+        <td>--node-group-auto-discovery is not at index 6</td>
+        <td>Run jsonpath command to find correct index, update <code>/6</code> accordingly</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- CLEANUP -->
+<div id="cleanup" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(239,68,68,0.15);">🧹</div>
+    <div>
+      <div class="section-num">CLEANUP</div>
+      <div class="section-title">Delete All CA Lab Resources</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+    <div class="code-wrap">
+      <div class="code-header"><span class="code-label">BASH</span><button class="copy-btn" onclick="copyCode(this)">copy</button></div>
+      <pre><span class="cm"># 1. Delete test deployment</span>
+kubectl delete deployment ca-test 2>/dev/null
+
+<span class="cm"># 2. Delete CA deployment and all its resources</span>
+kubectl -n kube-system delete deployment cluster-autoscaler
+kubectl delete clusterrole cluster-autoscaler
+kubectl delete clusterrolebinding cluster-autoscaler
+kubectl delete role cluster-autoscaler -n kube-system
+kubectl delete rolebinding cluster-autoscaler -n kube-system
+kubectl delete serviceaccount cluster-autoscaler -n kube-system
+
+<span class="cm"># 3. Verify clean</span>
+kubectl get pods -n kube-system | grep cluster-autoscaler
+kubectl get pods -l app=ca-test
+<span class="cm"># Both should return: No resources found</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- INTERVIEW QA -->
+<div id="interview" class="section-banner">
+  <div class="section-banner-inner">
+    <div class="section-icon" style="background:rgba(168,85,247,0.15);">🎓</div>
+    <div>
+      <div class="section-num">INTERVIEW PREP</div>
+      <div class="section-title">Common CA Interview Questions</div>
+    </div>
+  </div>
+</div>
+<div class="content-block" style="padding-top:0;">
+  <div class="content-inner">
+
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <div class="step" style="border-color:rgba(59,130,246,0.3);">
+        <div class="step-header" style="background:rgba(59,130,246,0.08);">
+          <div style="color:var(--blue);font-weight:700;font-size:14px;">Q</div>
+          <div style="font-weight:600;">What triggers CA to scale up?</div>
+        </div>
+        <div class="step-body">
+          <p style="margin:0;">CA scales up when one or more pods are in <strong>Pending</strong> state because they cannot be scheduled due to insufficient CPU or memory on existing nodes. CA runs a simulation: it checks if adding a node from any configured node group would allow the pending pod to be scheduled. If yes, it increases the ASG desired count by 1 and waits for the new node to join.</p>
+        </div>
+      </div>
+
+      <div class="step" style="border-color:rgba(16,185,129,0.3);">
+        <div class="step-header" style="background:rgba(16,185,129,0.08);">
+          <div style="color:var(--green);font-weight:700;font-size:14px;">Q</div>
+          <div style="font-weight:600;">What prevents CA from removing a node?</div>
+        </div>
+        <div class="step-body">
+          <p style="margin:0;">Several things block scale-down: pods with no controller (bare pods), pods with local storage (<code>emptyDir</code>), pods annotated with <code>cluster-autoscaler.kubernetes.io/safe-to-evict: "false"</code>, pods blocked by a PodDisruptionBudget, and nodes with custom taints. Also, a node must be under the utilisation threshold (<code>50%</code> default) for the entire <code>--scale-down-unneeded-time</code> window (10 min default).</p>
+        </div>
+      </div>
+
+      <div class="step" style="border-color:rgba(245,158,11,0.3);">
+        <div class="step-header" style="background:rgba(245,158,11,0.08);">
+          <div style="color:var(--orange);font-weight:700;font-size:14px;">Q</div>
+          <div style="font-weight:600;">CA vs Karpenter — key differences?</div>
+        </div>
+        <div class="step-body">
+          <table class="data-table" style="margin:0;">
+            <tr><th>Feature</th><th>Cluster Autoscaler</th><th>Karpenter</th></tr>
+            <tr><td>Speed</td><td>3-5 min (via ASG)</td><td>&lt;60 sec (direct EC2 API)</td></tr>
+            <tr><td>Instance selection</td><td>Fixed per node group</td><td>Automatic best-fit</td></tr>
+            <tr><td>Consolidation</td><td>Manual/limited</td><td>Automatic bin-packing</td></tr>
+            <tr><td>Setup</td><td>Simpler</td><td>More IAM setup required</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="step" style="border-color:rgba(168,85,247,0.3);">
+        <div class="step-header" style="background:rgba(168,85,247,0.08);">
+          <div style="color:var(--purple);font-weight:700;font-size:14px;">Q</div>
+          <div style="font-weight:600;">What is an expander in CA?</div>
+        </div>
+        <div class="step-body">
+          <p style="margin:0;">An expander is the strategy CA uses to decide <em>which node group</em> to scale up when multiple groups could fit the pending pod. Options: <code>least-waste</code> (fewest unused resources — recommended), <code>most-pods</code> (schedules most pods), <code>random</code> (random choice), <code>priority</code> (user-defined ranking). <code>least-waste</code> is best for cost efficiency.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Cluster Autoscaler Lab · EKS Mumbai (ap-south-1) · All real-world fixes included
+</div>
+
+<script>
+function copyCode(btn) {
+  const pre = btn.closest('.code-wrap').querySelector('pre');
+  const text = pre.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'var(--green)';
+    setTimeout(() => {
+      btn.textContent = 'copy';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

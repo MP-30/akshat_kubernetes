@@ -93,7 +93,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: pod-manager
-  namespace: team-a
+  namespace: team-b
 rules:
 - apiGroups: [""]
   resources: ["pods"]

@@ -1,0 +1,155 @@
+# All the users should be able  to read/create/delete all k8s resources(pods,services,deployments etc)  in test-ns and only able to read in prod namespace
+
+
+Requirement
+Namespace ->	Permission
+test-ns	  ->      Create, Read, Update, Delete all resources
+prod	  ->       Read-only
+All users  ->	Same permissions
+
+
+
+Step 1: Create Namespaces
+
+kubectl create ns test-ns
+kubectl create ns prod
+
+
+Step 2: Create Admin Role in test-ns
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: test-ns
+  name: test-ns-admin
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+
+
+
+kubectl apply -f test-admin-role.yaml
+
+This means:
+
+All Resources
+All API Groups
+All Verbs
+
+inside test-ns only.
+
+
+Step 3: Bind All Authenticated Users
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-ns-users
+  namespace: test-ns
+subjects:
+- kind: Group
+  name: system:authenticated
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: test-ns-admin
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+kubectl apply -f test-rolebinding.yaml
+
+system:authenticated means every logged-in Kubernetes user.
+
+
+
+Step 4: Create Read-Only Role for prod
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: prod
+  name: prod-reader
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs:
+  - get
+  - list
+  - watch
+
+
+kubectl apply -f prod-reader-role.yaml
+
+
+Step 5: Bind All Users in prod
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prod-readers
+  namespace: prod
+subjects:
+- kind: Group
+  name: system:authenticated
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: prod-reader
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+kubectl apply -f prod-rolebinding.yaml
+
+
+Verification
+
+As any user (for example akshat):
+
+Allowed:
+
+kubectl auth can-i create deployments \
+--as=akshat \
+-n test-ns
+o/p: yes
+
+kubectl auth can-i delete pods \
+--as=akshat \
+-n test-ns
+
+o/p: yes
+
+
+Read-only in prod
+
+
+kubectl auth can-i get pods \
+--as=akshat \
+-n prod
+
+
+o/p: yes
+
+
+kubectl auth can-i create pods \
+--as=akshat \
+-n prod
+
+
+o/p: no
+
+
+Role = permissions within a namespace.
+RoleBinding = assigns permissions.
+system:authenticated = all authenticated users.
+apiGroups: ["*"], resources: ["*"], verbs: ["*"] = full control over all Kubernetes resources in that namespace.
+get, list, watch = read-only access.
+
+This gives all users full access in test-ns and read-only access in prod.
+
+
+

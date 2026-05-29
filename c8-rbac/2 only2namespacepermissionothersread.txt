@@ -1,0 +1,137 @@
+
+### I want to give a specific user the permission of only two namespaces, that's it. So in that two namespaces, he can create the pod, in other namespaces he could only be able to read the pods, not able to edit.
+
+## continue from lab 1
+
+### first lets remove cluster wide permission for the user akshat which we gave in previous lab:
+
+kubectl get clusterrolebindings -o yaml | grep -B 5 -A 10 "name: akshat"
+
+kubectl delete clusterrolebinding akshat-view
+
+
+############LAB START##########
+
+
+A user should be only able to view create etc pods in two namespace team-a and team-b ..and all othernamespace it should be readonly
+
+
+#You can achieve this using multiple RoleBindings and one ClusterRoleBinding.
+
+
+
+Step 1: Give Read Access Everywhere
+
+Create a ClusterRoleBinding to the built-in view ClusterRole.
+
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: user-read-all
+subjects:
+- kind: User
+  name: akshat
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+
+
+kubectl get pods -A
+kubectl describe pods
+kubectl get svc
+
+
+across all namespace
+
+
+Step 2: Create a Role for Namespace Admin Activities
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-manager
+  namespace: team-a
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+
+
+
+Step 3: Bind User in team-a
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: akshat-team-a
+  namespace: team-a
+subjects:
+- kind: User
+  name: akshat
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-manager
+  apiGroup: rbac.authorization.k8s.io
+
+
+Step 4: Repeat for team-b
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: akshat-team-b
+  namespace: team-b
+subjects:
+- kind: User
+  name: akshat
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-manager
+  apiGroup: rbac.authorization.k8s.io
+
+
+Final result:
+
+team-a     → Read + Create + Update + Delete Pods
+team-b     → Read + Create + Update + Delete Pods
+dev        → Read Only
+qa         → Read Only
+prod       → Read Only
+
+#####
+
+kubectl auth can-i create pods \
+--as=akshat \
+-n prod
+
+#o/p: no
+
+kubectl auth can-i create pods \
+--as=akshat \
+-n team-a
+
+#o/p: yes
+
+
+
+
+
+
+
+
+
+

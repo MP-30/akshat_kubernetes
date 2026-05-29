@@ -90,6 +90,23 @@ roleRef:
 Step 4: Repeat for team-b
 
 apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pod-manager
+  namespace: team-a
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: akshat-team-b

@@ -1,0 +1,72 @@
+HOSTPATH LAB :
+
+
+1) Go to master and run  the manifest file
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    volumeMounts:
+    - name: storage
+      mountPath: /usr/share/nginx/html
+  volumes:
+  - name: storage
+    hostPath:
+      path: /hostpath-data
+      type: Directory
+
+
+2) kubectl apply -f hostpath.yml
+
+3) kubectl get pods -o wide
+# here u will get to know in which node the pod is created ...(container will not be created as it will not be able to find hostpath)
+
+4) connect to that specific node  ...which came in step 3
+
+5) #in the node run below command  
+sudo su
+mkdir /hostpath-data
+
+6) go back to master :
+kubectl get pods
+# you should now see 1/1 container running inside the pod
+
+7) Lets now verify if the mounting actually happened
+for that we will create a file in the hostpath directory and check if it is created in /usr/share/nginx/html of container 
+because we mounted /usr/share/nginx/html of the container of the pod with /hostpath-data of the node
+
+go back to the node:
+
+go to the location /hostpath-data in the node
+cd /hostpath-data
+touch testfile1.txt myfile.txt akshat.txt
+
+######## NOW WE WILL SEE FROM THE POD IF WE CAN SEE THESE FILES FROM /usr/share/nginx/html############
+
+Go to the master machine
+
+kubectl get pods
+## enter inside the pod with name hostpath-pod
+
+kubectl exec -it hostpath-pod -- bash
+
+cd /usr/share/nginx/html
+you will see the files
+
+
+
+
+
+
+
+
+
+
+
+
+
+

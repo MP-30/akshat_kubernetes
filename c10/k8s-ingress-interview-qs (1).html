@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Ingress — Interview Questions</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0f1a;
+  --s1: #0f1524;
+  --s2: #141c2e;
+  --bd: #1e2d4a;
+  --a1: #38bdf8;
+  --a2: #818cf8;
+  --a3: #34d399;
+  --a4: #fb923c;
+  --a5: #f472b6;
+  --tx: #cbd5e1;
+  --tx2: #64748b;
+  --tx3: #94a3b8;
+  --white: #f1f5f9;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);line-height:1.7;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 15% 15%,rgba(56,189,248,0.04) 0%,transparent 50%),radial-gradient(circle at 85% 85%,rgba(129,140,248,0.04) 0%,transparent 50%);pointer-events:none;z-index:0;}
+
+/* HERO */
+.hero{position:relative;padding:68px 40px 48px;text-align:center;z-index:1;}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.22);color:var(--a1);font-family:var(--mono);font-size:0.67rem;letter-spacing:0.15em;padding:5px 14px;border-radius:2px;margin-bottom:20px;text-transform:uppercase;}
+.hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--a3);box-shadow:0 0 8px var(--a3);}
+h1{font-size:clamp(1.8rem,4vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.03em;color:var(--white);margin-bottom:12px;}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-sub{color:var(--tx2);font-size:0.92rem;max-width:480px;margin:0 auto;}
+
+/* TOPBAR */
+.topbar{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;padding:13px 24px;background:var(--s1);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);position:relative;z-index:1;}
+.tb-item{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:0.71rem;color:var(--tx2);}
+.tb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* WRAP */
+.wrap{max-width:880px;margin:0 auto;padding:52px 22px;position:relative;z-index:1;}
+
+/* SECTION */
+.sec-label{font-family:var(--mono);font-size:0.64rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--a1);margin-bottom:5px;}
+.sec-title{font-size:1.35rem;font-weight:700;color:var(--white);padding-bottom:11px;border-bottom:1px solid var(--bd);margin-bottom:24px;}
+
+/* CATEGORY HEADER */
+.cat-hd{display:flex;align-items:center;gap:12px;margin:36px 0 18px;}
+.cat-line{flex:1;height:1px;background:var(--bd);}
+.cat-pill{font-family:var(--mono);font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;padding:4px 12px;border-radius:20px;white-space:nowrap;}
+.cat-pill.blue{background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.2);color:var(--a1);}
+.cat-pill.purple{background:rgba(129,140,248,0.1);border:1px solid rgba(129,140,248,0.2);color:var(--a2);}
+.cat-pill.green{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);color:var(--a3);}
+.cat-pill.orange{background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.2);color:var(--a4);}
+.cat-pill.pink{background:rgba(244,114,182,0.1);border:1px solid rgba(244,114,182,0.2);color:var(--a5);}
+
+/* Q CARD */
+.qcard{background:var(--s1);border:1px solid var(--bd);border-radius:5px;margin-bottom:14px;overflow:hidden;transition:border-color .2s;}
+.qcard:hover{border-color:var(--bd2, #253558);}
+.qcard-hd{display:flex;align-items:flex-start;gap:14px;padding:16px 18px;cursor:pointer;user-select:none;}
+.qcard-hd:hover .q-text{color:var(--white);}
+.qnum{font-family:var(--mono);font-size:0.68rem;color:var(--tx2);flex-shrink:0;margin-top:3px;min-width:28px;}
+.q-text{font-size:0.93rem;font-weight:500;color:var(--tx);flex:1;transition:color .2s;}
+.chevron{flex-shrink:0;width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:var(--tx2);transition:transform .25s;margin-top:2px;}
+.chevron svg{width:14px;height:14px;}
+.qcard.open .chevron{transform:rotate(180deg);}
+.qcard.open .q-text{color:var(--white);}
+.qcard.open{border-color:rgba(56,189,248,0.25);}
+
+/* ANSWER */
+.ans{display:none;padding:0 18px 18px 60px;}
+.qcard.open .ans{display:block;}
+.ans p{color:var(--tx3);font-size:0.88rem;margin-bottom:10px;}
+.ans p:last-child{margin-bottom:0;}
+
+/* CODE in answer */
+.ans .cb{background:#050810;border:1px solid var(--bd);border-radius:4px;margin:10px 0;overflow:hidden;}
+.ans .cb-hd{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;background:rgba(255,255,255,0.02);border-bottom:1px solid var(--bd);}
+.ans .cb-lang{font-family:var(--mono);font-size:0.62rem;color:var(--tx2);text-transform:uppercase;letter-spacing:0.1em;}
+.cpbtn{background:none;border:1px solid var(--bd);color:var(--tx2);font-family:var(--mono);font-size:0.62rem;padding:2px 8px;border-radius:3px;cursor:pointer;transition:all .2s;}
+.cpbtn:hover{border-color:var(--a1);color:var(--a1);}
+.ans pre{padding:13px 15px;font-family:var(--mono);font-size:0.77rem;line-height:1.65;color:#94a3b8;overflow-x:auto;}
+.kw{color:var(--a2);}
+.val{color:var(--a3);}
+.str{color:#fbbf24;}
+.key{color:var(--a1);}
+.cm{color:#3a4a6a;font-style:italic;}
+
+/* inline code in answers */
+.ans code{font-family:var(--mono);font-size:0.8em;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.14);padding:1px 5px;border-radius:3px;color:var(--a1);}
+
+/* answer table */
+.ans table{width:100%;border-collapse:collapse;font-size:0.82rem;margin:10px 0;}
+.ans th{background:var(--s2);padding:7px 12px;text-align:left;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--tx2);border-bottom:1px solid var(--bd);}
+.ans td{padding:7px 12px;border-bottom:1px solid rgba(30,45,74,0.5);color:var(--tx3);font-family:var(--mono);font-size:0.75rem;}
+.ans tr:last-child td{border-bottom:none;}
+
+/* answer list */
+.ans ul{margin:8px 0 10px 0;padding-left:0;list-style:none;}
+.ans ul li{padding:3px 0 3px 20px;position:relative;color:var(--tx3);font-size:0.88rem;}
+.ans ul li::before{content:'▸';position:absolute;left:0;color:var(--a1);font-size:0.75rem;top:5px;}
+
+/* highlight box inside answer */
+.ans .hbox{background:rgba(56,189,248,0.05);border-left:3px solid var(--a1);border-radius:0 4px 4px 0;padding:10px 14px;margin:10px 0;font-size:0.86rem;color:var(--tx3);}
+.ans .hbox strong{color:var(--a1);}
+
+/* STATS */
+.stats{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin-bottom:36px;}
+.stat{text-align:center;}
+.stat .n{font-family:var(--mono);font-size:1.8rem;font-weight:600;color:var(--white);}
+.stat .l{font-size:0.75rem;color:var(--tx2);}
+
+footer{text-align:center;padding:36px 24px;color:var(--tx2);font-size:0.74rem;border-top:1px solid var(--bd);font-family:var(--mono);position:relative;z-index:1;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag"><span class="dot"></span> Interview Prep · Kubernetes</div>
+  <h1>Ingress &amp; Ingress<br><em>Controller Questions</em></h1>
+  <p class="hero-sub">Click any question to reveal the answer. Covers concepts, configuration, routing, and troubleshooting.</p>
+</div>
+
+<div class="topbar">
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a1);box-shadow:0 0 6px var(--a1)"></span>Concepts</div>
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a2);box-shadow:0 0 6px var(--a2)"></span>Configuration</div>
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a3);box-shadow:0 0 6px var(--a3)"></span>Routing</div>
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a4);box-shadow:0 0 6px var(--a4)"></span>EKS / AWS</div>
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a5);box-shadow:0 0 6px var(--a5)"></span>Troubleshooting</div>
+</div>
+
+<div class="wrap">
+
+<div class="stats">
+  <div class="stat"><div class="n">25</div><div class="l">Total Questions</div></div>
+  <div class="stat"><div class="n">5</div><div class="l">Categories</div></div>
+  <div class="stat"><div class="n">Click</div><div class="l">to Reveal Answer</div></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CATEGORY 1 — CONCEPTS
+════════════════════════════════════════════ -->
+<div class="cat-hd"><div class="cat-line"></div><div class="cat-pill blue">Concepts</div><div class="cat-line"></div></div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q1</span>
+    <span class="q-text">What is a Kubernetes Ingress and why do we need it?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>Ingress is a Kubernetes API object that manages external HTTP/HTTPS access to services inside the cluster. It acts as a smart entry point that routes incoming requests to the correct backend service based on rules you define.</p>
+    <p>Without Ingress, you need one LoadBalancer Service per application — which means one AWS ELB per app, which is expensive and hard to manage. Ingress consolidates all traffic through a single entry point.</p>
+    <table>
+      <tr><th>Without Ingress</th><th>With Ingress</th></tr>
+      <tr><td>3 apps = 3 LoadBalancers</td><td>3 apps = 1 LoadBalancer</td></tr>
+      <tr><td>3 different IPs for users</td><td>1 IP, rules differentiate apps</td></tr>
+      <tr><td>TLS configured per service</td><td>TLS terminated once at Ingress</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q2</span>
+    <span class="q-text">What is the difference between an Ingress and an Ingress Controller?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p><strong style="color:var(--white)">Ingress</strong> is just a YAML configuration object — it defines the routing rules (which hostname/path goes to which service). By itself it does nothing.</p>
+    <p><strong style="color:var(--white)">Ingress Controller</strong> is the actual software (a pod running in your cluster) that reads those Ingress rules and implements them. It watches for Ingress objects and configures itself to route traffic accordingly.</p>
+    <div class="hbox"><strong>Analogy:</strong> Ingress is the traffic rulebook. Ingress Controller is the traffic cop that reads and enforces the rulebook.</div>
+    <p>Common Ingress Controllers: NGINX, Traefik, AWS ALB Ingress Controller, HAProxy. You must install a controller — Kubernetes does not ship one by default.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q3</span>
+    <span class="q-text">What is <code>ingressClassName</code> and why is it needed?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p><code>ingressClassName</code> tells Kubernetes which Ingress Controller should handle this Ingress object. A cluster can have multiple Ingress Controllers installed simultaneously (e.g. nginx AND traefik).</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">yaml</span></div><pre><span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>   <span class="cm"># this Ingress is handled by the nginx controller</span></pre></div>
+    <p>Without it, no controller picks up the Ingress and your routing rules are never applied. Each Ingress Controller registers itself with a class name when installed.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q4</span>
+    <span class="q-text">What is the difference between <code>pathType: Prefix</code> and <code>pathType: Exact</code>?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <table>
+      <tr><th>pathType</th><th>Behaviour</th><th>Example path: /app</th></tr>
+      <tr><td>Prefix</td><td>Matches /app and anything starting with /app</td><td>/app, /app/home, /app/v1/users all match</td></tr>
+      <tr><td>Exact</td><td>Matches only that exact path, nothing else</td><td>Only /app matches. /app/home does NOT</td></tr>
+      <tr><td>ImplementationSpecific</td><td>Controller decides the matching logic</td><td>Depends on the Ingress Controller used</td></tr>
+    </table>
+    <p>In most production setups <code>Prefix</code> is used so the entire application hierarchy is covered by one rule.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q5</span>
+    <span class="q-text">What does the <code>rewrite-target</code> annotation do?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>When using path-based routing, the path prefix needs to be stripped before forwarding to the backend. For example, if a user hits <code>/pyapp/home</code>, the app probably expects just <code>/home</code> — not <code>/pyapp/home</code>.</p>
+    <p><code>rewrite-target: /</code> rewrites every incoming path to <code>/</code> before forwarding.</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">yaml</span></div><pre><span class="key">annotations</span>:
+  <span class="key">nginx.ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span></pre></div>
+    <div class="hbox"><strong>Important:</strong> The annotation prefix must be <code>nginx.ingress.kubernetes.io/</code> — using just <code>ingress.kubernetes.io/</code> is silently ignored by the NGINX controller.</div>
+    <p>In host-based routing this is usually not needed since all requests already hit <code>/</code>.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CATEGORY 2 — CONFIGURATION
+════════════════════════════════════════════ -->
+<div class="cat-hd"><div class="cat-line"></div><div class="cat-pill purple">Configuration</div><div class="cat-line"></div></div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q6</span>
+    <span class="q-text">Write a minimal Ingress YAML that routes <code>/api</code> to a service called <code>api-svc</code> on port 80.</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre><span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">api-ingress</span>
+  <span class="key">annotations</span>:
+    <span class="key">nginx.ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span>
+<span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">rules</span>:
+  - <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/api</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">api-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span></pre></div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q7</span>
+    <span class="q-text">How do you configure host-based routing in an Ingress? What field do you add?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>Add the <code>host:</code> field to each rule. NGINX reads the incoming HTTP <code>Host</code> header and matches it against these values.</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre><span class="kw">spec</span>:
+  <span class="key">rules</span>:
+  - <span class="key">host</span>: <span class="str">"app1.example.com"</span>   <span class="cm"># ← this is the only change from path-based</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">app1-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+  - <span class="key">host</span>: <span class="str">"app2.example.com"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">app2-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span></pre></div>
+    <p>Each hostname must resolve to the Ingress Controller's IP via DNS. In labs, <code>nip.io</code> is used so no DNS setup is needed.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q8</span>
+    <span class="q-text">What happens if a request arrives with a Host header that does not match any Ingress rule?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>By default, NGINX returns a <strong style="color:var(--white)">404 Not Found</strong> response. To handle unmatched requests gracefully, you can configure a <code>defaultBackend</code> in the Ingress spec:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre><span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">defaultBackend</span>:          <span class="cm"># catches everything that doesn't match</span>
+    <span class="key">service</span>:
+      <span class="key">name</span>: <span class="val">my-default-backend</span>
+      <span class="key">port</span>:
+        <span class="key">number</span>: <span class="val">80</span>
+  <span class="key">rules</span>:
+    <span class="cm">  # ... your host rules here</span></pre></div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q9</span>
+    <span class="q-text">Can you have both host-based and path-based routing in the same Ingress rule?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>Yes. You can specify both a <code>host:</code> and multiple <code>paths</code> within the same rule. NGINX first matches the hostname, then evaluates the paths within that host.</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre>- <span class="key">host</span>: <span class="str">"api.example.com"</span>
+  <span class="key">http</span>:
+    <span class="key">paths</span>:
+    - <span class="key">path</span>: <span class="val">/v1</span>      <span class="cm"># api.example.com/v1 → v1-svc</span>
+      <span class="key">pathType</span>: <span class="val">Prefix</span>
+      <span class="key">backend</span>:
+        <span class="key">service</span>:
+          <span class="key">name</span>: <span class="val">v1-svc</span>
+          <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}
+    - <span class="key">path</span>: <span class="val">/v2</span>      <span class="cm"># api.example.com/v2 → v2-svc</span>
+      <span class="key">pathType</span>: <span class="val">Prefix</span>
+      <span class="key">backend</span>:
+        <span class="key">service</span>:
+          <span class="key">name</span>: <span class="val">v2-svc</span>
+          <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}</pre></div>
+    <p>More specific (longer) paths take priority over shorter ones when multiple paths could match.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q10</span>
+    <span class="q-text">What namespace does the NGINX Ingress Controller install into, and why does that matter?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>The NGINX Ingress Controller installs into the <code>ingress-nginx</code> namespace. This matters for several reasons:</p>
+    <ul>
+      <li>All <code>kubectl</code> commands to check or manage the controller need <code>-n ingress-nginx</code></li>
+      <li>The controller Service (NodePort/LoadBalancer) is in this namespace — this is where you get the external IP or NodePort</li>
+      <li>Logs are accessed via <code>kubectl logs -n ingress-nginx deployment/ingress-nginx-controller</code></li>
+      <li>Deleting the controller means deleting from this namespace</li>
+    </ul>
+    <p>The Ingress objects themselves live in the <code>default</code> namespace (or wherever your app is). The controller watches all namespaces.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CATEGORY 3 — ROUTING
+════════════════════════════════════════════ -->
+<div class="cat-hd"><div class="cat-line"></div><div class="cat-pill green">Routing</div><div class="cat-line"></div></div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q11</span>
+    <span class="q-text">How does NGINX Ingress actually decide which backend to send a request to?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>NGINX Ingress evaluates every incoming request using this order of priority:</p>
+    <ul>
+      <li><strong style="color:var(--white)">1. Host header match</strong> — finds rules where the <code>host:</code> field matches the HTTP Host header</li>
+      <li><strong style="color:var(--white)">2. Path match</strong> — within the matched host, finds the longest matching path</li>
+      <li><strong style="color:var(--white)">3. Default backend</strong> — if nothing matches, uses <code>defaultBackend</code> if configured, otherwise returns 404</li>
+    </ul>
+    <div class="hbox">Longer/more specific paths always win over shorter ones. <code>/app/v2</code> beats <code>/app</code> beats <code>/</code>.</div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q12</span>
+    <span class="q-text">What is nip.io and why is it used in labs instead of real DNS?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p><code>nip.io</code> is a free public wildcard DNS service. Any hostname in the format <code>anything.IP_ADDRESS.nip.io</code> automatically resolves to that IP address — no DNS record creation needed.</p>
+    <table>
+      <tr><th>Hostname</th><th>Resolves to</th></tr>
+      <tr><td>pyapp.65.2.186.80.nip.io</td><td>65.2.186.80</td></tr>
+      <tr><td>petclinic.65.2.186.80.nip.io</td><td>65.2.186.80</td></tr>
+      <tr><td>anything.65.2.186.80.nip.io</td><td>65.2.186.80</td></tr>
+    </table>
+    <p>Each hostname resolves to the same IP but sends a different <code>Host:</code> header — which is exactly what NGINX needs to make routing decisions. In production, you'd use real DNS A records instead.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q13</span>
+    <span class="q-text">If you have two worker nodes, which node's IP do you use in the Ingress host rule?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>Either one. NodePort is a <strong style="color:var(--white)">cluster-wide</strong> feature — the port is opened on every worker node. When traffic hits any node on the NodePort, Kubernetes internally routes it to the correct pod regardless of which node the pod is running on.</p>
+    <p>So <code>pyapp.65.2.186.80.nip.io:32606</code> and <code>pyapp.43.205.93.11.nip.io:32606</code> would both work. The important thing is that the hostname you put in the Ingress rule matches the hostname the browser sends in the Host header.</p>
+    <div class="hbox"><strong>Tip:</strong> Pick one IP and use it consistently for all your hostnames in one Ingress file. Don't mix IPs across rules unnecessarily.</div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q14</span>
+    <span class="q-text">What is the difference between a ClusterIP service and a NodePort service in the context of Ingress?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>The <strong style="color:var(--white)">backend services</strong> referenced in Ingress rules (pyapp-svc, unapp-svc etc.) should be <strong style="color:var(--white)">ClusterIP</strong> — they only need to be reachable inside the cluster, not from outside. NGINX routes traffic to them internally.</p>
+    <p>The <strong style="color:var(--white)">Ingress Controller's own service</strong> needs to be <code>LoadBalancer</code> or <code>NodePort</code> so it can receive traffic from outside the cluster.</p>
+    <table>
+      <tr><th>Service</th><th>Type</th><th>Why</th></tr>
+      <tr><td>pyapp-svc, unapp-svc, petclinic-svc</td><td>ClusterIP</td><td>Only NGINX needs to reach them</td></tr>
+      <tr><td>ingress-nginx-controller</td><td>LoadBalancer / NodePort</td><td>Must be reachable from internet</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q15</span>
+    <span class="q-text">How do you find the NodePort assigned to the NGINX Ingress Controller?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre>kubectl get svc -n ingress-nginx ingress-nginx-controller</pre></div>
+    <p>The output shows something like <code>80:32606/TCP, 443:31750/TCP</code>. The format is <code>clusterPort:nodePort/protocol</code>. So <code>32606</code> is the NodePort for HTTP traffic.</p>
+    <p>Kubernetes auto-assigns a port from the range <strong style="color:var(--white)">30000–32767</strong>. If the cluster is recreated, the NodePort changes — always verify before accessing from the browser.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CATEGORY 4 — EKS / AWS
+════════════════════════════════════════════ -->
+<div class="cat-hd"><div class="cat-line"></div><div class="cat-pill orange">EKS / AWS</div><div class="cat-line"></div></div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q16</span>
+    <span class="q-text">Why does the Ingress Controller service stay in <code>&lt;pending&gt;</code> on AWS Academy accounts?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>The NGINX Ingress Controller creates a Service of type <code>LoadBalancer</code>. On EKS, this triggers AWS to create an Elastic Load Balancer. AWS Academy/Learner Lab accounts have this service restricted.</p>
+    <p>The exact error from <code>kubectl describe svc ingress-nginx-controller -n ingress-nginx</code>:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">error output</span></div><pre>OperationNotPermitted: This AWS account currently does not support
+creating load balancers. Please contact AWS Support.</pre></div>
+    <p>The fix is to patch the service to NodePort instead:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre>kubectl patch svc ingress-nginx-controller \
+  -n ingress-nginx \
+  -p '{"spec": {"type": "NodePort"}}'</pre></div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q17</span>
+    <span class="q-text">What Security Group change is needed for NodePort access on EKS?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>By default, EC2 Security Groups block all inbound traffic. To access your app through the NodePort, you must add an inbound rule on the worker node's Security Group:</p>
+    <ul>
+      <li>Protocol: TCP</li>
+      <li>Port: your NodePort (e.g. 32606)</li>
+      <li>Source: 0.0.0.0/0 (or restrict to your IP for security)</li>
+    </ul>
+    <p>Without this rule, the browser shows <code>ERR_CONNECTION_TIMED_OUT</code> — the connection drops silently at the network level before even reaching Kubernetes.</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre>aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxxxxxxxx \
+  --protocol tcp \
+  --port 32606 \
+  --cidr 0.0.0.0/0 \
+  --region ap-south-1</pre></div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q18</span>
+    <span class="q-text">How do you find the public IP of an EKS worker node?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>The simplest way on EKS is:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre>kubectl get nodes -o wide
+<span class="cm"># Look at the EXTERNAL-IP column</span></pre></div>
+    <p>You can also use AWS CLI:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre>aws ec2 describe-instances \
+  --filters "Name=private-ip-address,Values=192.168.7.124" \
+  --query "Reservations[].Instances[].PublicIpAddress" \
+  --region ap-south-1</pre></div>
+    <p>Or extract it programmatically:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre>kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}'</pre></div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q19</span>
+    <span class="q-text">What is the difference between LoadBalancer and NodePort service types on EKS?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <table>
+      <tr><th>Aspect</th><th>LoadBalancer</th><th>NodePort</th></tr>
+      <tr><td>AWS resource created</td><td>ELB/ALB/NLB provisioned automatically</td><td>Nothing — uses node port directly</td></tr>
+      <tr><td>External access URL</td><td>ELB DNS name (clean URL)</td><td>node-public-ip:port (ugly port)</td></tr>
+      <tr><td>Cost</td><td>Paid AWS resource per service</td><td>Free — just a port on EC2</td></tr>
+      <tr><td>AWS Academy</td><td>Blocked (OperationNotPermitted)</td><td>Works</td></tr>
+      <tr><td>Port range</td><td>Standard 80/443</td><td>30000–32767 only</td></tr>
+      <tr><td>Production use</td><td>Yes — preferred</td><td>Dev/lab only</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CATEGORY 5 — TROUBLESHOOTING
+════════════════════════════════════════════ -->
+<div class="cat-hd"><div class="cat-line"></div><div class="cat-pill pink">Troubleshooting</div><div class="cat-line"></div></div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q20</span>
+    <span class="q-text">The browser shows <code>ERR_CONNECTION_TIMED_OUT</code>. What are the likely causes?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>Connection timeout means the packet never reached the server (or was dropped silently). Check in this order:</p>
+    <ul>
+      <li><strong style="color:var(--white)">NodePort missing in URL</strong> — browser used port 80 by default, controller is on 32606</li>
+      <li><strong style="color:var(--white)">Security Group blocked</strong> — EC2 inbound rule for the NodePort is missing</li>
+      <li><strong style="color:var(--white)">Wrong IP</strong> — the IP in the URL doesn't belong to any worker node</li>
+      <li><strong style="color:var(--white)">Controller not running</strong> — check <code>kubectl get pods -n ingress-nginx</code></li>
+    </ul>
+    <p>The fix in 90% of lab cases: add <code>:32606</code> to the URL, or open the NodePort in the EC2 Security Group.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q21</span>
+    <span class="q-text">NGINX returns 404 even though the Ingress rule is applied. How do you debug this?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>A 404 from NGINX means the controller is reachable but no rule matched. Debug steps:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre><span class="cm"># 1. Check what hosts the Ingress knows about</span>
+kubectl get ingress
+kubectl describe ingress apps-host-ingress
+
+<span class="cm"># 2. Test by sending the Host header manually</span>
+curl -v http://65.2.186.80:32606 -H "Host: pyapp.65.2.186.80.nip.io"
+
+<span class="cm"># 3. Check NGINX controller logs for routing decisions</span>
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller --tail=30</pre></div>
+    <p>Common causes: typo in the <code>host:</code> field, wrong annotation prefix (<code>ingress.kubernetes.io/</code> instead of <code>nginx.ingress.kubernetes.io/</code>), or Ingress not yet synced.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q22</span>
+    <span class="q-text">All hostnames route to the same application. What is the most likely cause?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>The <code>host:</code> field is missing from the Ingress rules. Without it, every rule is treated as a path-based rule with no hostname restriction — all requests fall through to the same backend.</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">yaml</span></div><pre><span class="cm"># WRONG — no host field, all traffic goes to pyapp-svc</span>
+- <span class="key">http</span>:
+    <span class="key">paths</span>:
+    - <span class="key">path</span>: <span class="val">/</span>
+      <span class="key">backend</span>:
+        <span class="key">service</span>:
+          <span class="key">name</span>: <span class="val">pyapp-svc</span>
+          <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}
+
+<span class="cm"># CORRECT — host field added</span>
+- <span class="key">host</span>: <span class="str">"pyapp.65.2.186.80.nip.io"</span>
+  <span class="key">http</span>:
+    <span class="key">paths</span>:
+    - <span class="key">path</span>: <span class="val">/</span>
+      <span class="key">backend</span>:
+        <span class="key">service</span>:
+          <span class="key">name</span>: <span class="val">pyapp-svc</span>
+          <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}</pre></div>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q23</span>
+    <span class="q-text">The Ingress rule is applied but <code>kubectl get ingress</code> shows no ADDRESS. What does this mean?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>The Ingress Controller is not running or is not watching this Ingress object. Possible reasons:</p>
+    <ul>
+      <li>The Ingress Controller was never installed</li>
+      <li><code>ingressClassName: nginx</code> doesn't match the installed controller's class</li>
+      <li>The controller pod is in <code>CrashLoopBackOff</code> or <code>Pending</code> state</li>
+    </ul>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash — check</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre><span class="cm"># Is the controller running?</span>
+kubectl get pods -n ingress-nginx
+
+<span class="cm"># What IngressClass names are available?</span>
+kubectl get ingressclass</pre></div>
+    <p>The ADDRESS column populates only after the controller picks up the Ingress and the service has an external IP or NodePort assigned.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q24</span>
+    <span class="q-text">How do you verify that NGINX is actually reading the Host header correctly?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>Use <code>curl</code> to manually set the Host header and connect to the raw IP — this is exactly what the browser does when you type the hostname:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre><span class="cm"># Test pyapp routing</span>
+curl -v http://65.2.186.80:32606 -H "Host: pyapp.65.2.186.80.nip.io"
+
+<span class="cm"># Test petclinic routing</span>
+curl -v http://65.2.186.80:32606 -H "Host: petclinic.65.2.186.80.nip.io"
+
+<span class="cm"># Test unmatched host — should return 404</span>
+curl -v http://65.2.186.80:32606 -H "Host: unknown.example.com"</pre></div>
+    <p>This technique isolates the DNS layer completely — if curl with a Host header works but the browser doesn't, the issue is DNS resolution, not Ingress routing.</p>
+  </div>
+</div>
+
+<div class="qcard" onclick="toggle(this)">
+  <div class="qcard-hd">
+    <span class="qnum">Q25</span>
+    <span class="q-text">A backend returns 503 Service Unavailable through Ingress. What do you check?</span>
+    <span class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></span>
+  </div>
+  <div class="ans">
+    <p>503 means NGINX reached the controller but could not forward to the backend. Check in this order:</p>
+    <div class="cb"><div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div><pre><span class="cm"># 1. Are the backend pods Running?</span>
+kubectl get pods
+
+<span class="cm"># 2. Does the Service selector match the pod labels?</span>
+kubectl describe svc pyapp-svc
+kubectl get pods --show-labels
+
+<span class="cm"># 3. Are there endpoints registered? (empty = selector mismatch)</span>
+kubectl get endpoints pyapp-svc
+
+<span class="cm"># 4. Does the Service port match the containerPort?</span>
+kubectl describe svc pyapp-svc</pre></div>
+    <p>The most common cause is a label mismatch between the Service <code>selector</code> and the pod <code>labels</code> — the Service exists but has zero endpoints, so NGINX has nowhere to send traffic.</p>
+  </div>
+</div>
+
+</div><!-- end wrap -->
+
+<footer>Kubernetes Ingress Interview Questions · Host-Based Routing · EKS ap-south-1</footer>
+
+<script>
+function toggle(card){
+  card.classList.toggle('open');
+}
+function cp(btn){
+  const pre=btn.closest('.cb').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(()=>{
+    btn.textContent='copied!';
+    btn.style.color='var(--a3)';
+    btn.style.borderColor='var(--a3)';
+    setTimeout(()=>{btn.textContent='copy';btn.style.color='';btn.style.borderColor='';},1800);
+  });
+}
+</script>
+</body>
+</html>

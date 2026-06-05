@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Host-Based Ingress on EKS — Complete Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0f1a;
+  --s1: #0f1524;
+  --s2: #141c2e;
+  --bd: #1e2d4a;
+  --bd2: #253558;
+  --a1: #38bdf8;
+  --a2: #818cf8;
+  --a3: #34d399;
+  --a4: #fb923c;
+  --a5: #f472b6;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --tx: #cbd5e1;
+  --tx2: #64748b;
+  --tx3: #94a3b8;
+  --white: #f1f5f9;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);line-height:1.7;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 20% 20%, rgba(56,189,248,0.04) 0%,transparent 50%),radial-gradient(circle at 80% 80%, rgba(129,140,248,0.04) 0%,transparent 50%);pointer-events:none;z-index:0;}
+
+/* HERO */
+.hero{position:relative;padding:72px 40px 52px;text-align:center;z-index:1;}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);color:var(--a1);font-family:var(--mono);font-size:0.68rem;letter-spacing:0.15em;padding:5px 14px;border-radius:2px;margin-bottom:20px;text-transform:uppercase;}
+.hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--a3);box-shadow:0 0 8px var(--a3);}
+h1{font-size:clamp(1.9rem,4.5vw,3.2rem);font-weight:700;line-height:1.1;letter-spacing:-0.03em;color:var(--white);margin-bottom:14px;}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-sub{color:var(--tx2);font-size:0.95rem;max-width:520px;margin:0 auto;}
+
+/* TOP BAR */
+.topbar{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;padding:14px 24px;background:var(--s1);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);position:relative;z-index:1;}
+.tb-item{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:0.72rem;color:var(--tx2);}
+.tb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* CONTAINER */
+.wrap{max-width:960px;margin:0 auto;padding:52px 22px;position:relative;z-index:1;}
+
+/* SECTION */
+.sec-label{font-family:var(--mono);font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--a1);margin-bottom:5px;}
+.sec-title{font-size:1.45rem;font-weight:700;color:var(--white);padding-bottom:12px;border-bottom:1px solid var(--bd);margin-bottom:22px;}
+
+/* STEP CARD */
+.step{background:var(--s1);border:1px solid var(--bd);border-radius:5px;margin-bottom:28px;overflow:hidden;position:relative;}
+.step::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--a1),var(--a2));}
+.step-hd{display:flex;align-items:flex-start;gap:14px;padding:16px 22px;background:var(--s2);border-bottom:1px solid var(--bd);}
+.snum{width:32px;height:32px;background:linear-gradient(135deg,var(--a1),var(--a2));border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:0.78rem;color:#000;flex-shrink:0;margin-top:2px;}
+.snum.grn{background:linear-gradient(135deg,var(--a3),#059669);}
+.snum.org{background:linear-gradient(135deg,var(--a4),#ea580c);}
+.snum.red{background:linear-gradient(135deg,var(--danger),#dc2626);}
+.s-title{font-size:1rem;font-weight:700;color:var(--white);}
+.s-sub{font-size:0.77rem;color:var(--tx2);margin-top:2px;}
+.step-body{padding:20px 22px;}
+.step-body p{color:var(--tx3);margin-bottom:12px;font-size:0.9rem;}
+
+/* CODE */
+.cb{background:#050810;border:1px solid var(--bd);border-radius:4px;margin:12px 0;overflow:hidden;}
+.cb-hd{display:flex;align-items:center;justify-content:space-between;padding:6px 13px;background:rgba(255,255,255,0.02);border-bottom:1px solid var(--bd);}
+.cb-lang{font-family:var(--mono);font-size:0.64rem;color:var(--tx2);text-transform:uppercase;letter-spacing:0.1em;}
+.cpbtn{background:none;border:1px solid var(--bd);color:var(--tx2);font-family:var(--mono);font-size:0.64rem;padding:2px 9px;border-radius:3px;cursor:pointer;transition:all .2s;}
+.cpbtn:hover{border-color:var(--a1);color:var(--a1);}
+pre{padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:0.79rem;line-height:1.68;color:#94a3b8;}
+.kw{color:var(--a2);}
+.val{color:var(--a3);}
+.str{color:var(--warn);}
+.cm{color:#3a4a6a;font-style:italic;}
+.key{color:var(--a1);}
+.hl{color:var(--a5);font-weight:600;}
+
+/* ALERT BOXES */
+.alert{display:flex;gap:11px;padding:13px 15px;border-radius:4px;margin:12px 0;font-size:0.86rem;}
+.alert.note{background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.18);color:#7dd3fc;}
+.alert.warn{background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.18);color:#fde68a;}
+.alert.ok{background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.18);color:#6ee7b7;}
+.alert.err{background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);color:#fca5a5;}
+.ai{flex-shrink:0;margin-top:1px;}
+
+/* TABLE */
+.tw{overflow-x:auto;margin:12px 0;}
+table{width:100%;border-collapse:collapse;font-size:0.83rem;}
+th{background:var(--s2);padding:8px 13px;text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--tx2);border-bottom:1px solid var(--bd);}
+td{padding:8px 13px;border-bottom:1px solid rgba(30,45,74,0.6);color:var(--tx3);font-family:var(--mono);font-size:0.76rem;}
+tr:last-child td{border-bottom:none;}
+
+/* TAGS */
+.tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:0.69rem;font-family:var(--mono);}
+.tag.g{background:rgba(52,211,153,0.12);color:#6ee7b7;}
+.tag.b{background:rgba(56,189,248,0.1);color:#7dd3fc;}
+.tag.p{background:rgba(129,140,248,0.1);color:#c7d2fe;}
+.tag.y{background:rgba(251,191,36,0.1);color:#fde68a;}
+.tag.r{background:rgba(248,113,113,0.1);color:#fca5a5;}
+
+/* INLINE CODE */
+code{font-family:var(--mono);font-size:0.81em;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.14);padding:1px 5px;border-radius:3px;color:var(--a1);}
+
+/* ARCH BOX */
+.arch{background:#050810;border:1px solid var(--bd);border-radius:4px;padding:22px 24px;margin:12px 0;font-family:var(--mono);font-size:0.78rem;line-height:2;color:var(--tx2);overflow-x:auto;}
+.arch .c1{color:var(--a1);}
+.arch .c2{color:var(--a2);}
+.arch .c3{color:var(--a3);}
+.arch .c4{color:var(--a4);}
+.arch .c5{color:var(--a5);}
+.arch .c6{color:var(--warn);}
+
+/* SUMMARY GRID */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:16px 0;}
+.scard{background:var(--s2);border:1px solid var(--bd);border-radius:4px;padding:14px 16px;}
+.scard .sl{font-family:var(--mono);font-size:0.64rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--tx2);margin-bottom:5px;}
+.scard .sv{font-size:0.87rem;font-weight:600;}
+
+/* FILE LABEL */
+.file-label{display:inline-block;font-family:var(--mono);font-size:0.7rem;background:rgba(129,140,248,0.1);border:1px solid rgba(129,140,248,0.2);color:var(--a2);padding:3px 10px;border-radius:3px;margin-bottom:8px;}
+
+/* CHECKLIST */
+ul.cl{list-style:none;margin:10px 0;}
+ul.cl li{padding:4px 0 4px 24px;position:relative;color:var(--tx3);font-size:0.87rem;}
+ul.cl li::before{content:'→';position:absolute;left:0;color:var(--a1);font-family:var(--mono);}
+
+footer{text-align:center;padding:36px 24px;color:var(--tx2);font-size:0.75rem;border-top:1px solid var(--bd);font-family:var(--mono);position:relative;z-index:1;}
+
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag"><span class="dot"></span> EKS Lab · Kubernetes Ingress</div>
+  <h1>Host-Based Ingress Routing<br><em>on Amazon EKS</em></h1>
+  <p class="hero-sub">Complete end-to-end lab — deploy apps, install NGINX Ingress Controller, configure host-based routing using nip.io, and clean up.</p>
+</div>
+
+<div class="topbar">
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a3);box-shadow:0 0 6px var(--a3)"></span>Platform: Amazon EKS ap-south-1</div>
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a1);box-shadow:0 0 6px var(--a1)"></span>Ingress: nginx v1.10.1</div>
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a2);box-shadow:0 0 6px var(--a2)"></span>Routing: HTTP Host header</div>
+  <div class="tb-item"><span class="tb-dot" style="background:var(--a4);box-shadow:0 0 6px var(--a4)"></span>DNS: nip.io wildcard</div>
+</div>
+
+<div class="wrap">
+
+<!-- OVERVIEW -->
+<p class="sec-label">// Architecture</p>
+<h2 class="sec-title">What We Are Building</h2>
+
+<p style="color:var(--tx3);margin-bottom:16px;font-size:0.92rem;">Three sample apps + a default backend, each exposed under a unique hostname. One NGINX Ingress Controller reads the HTTP <code>Host</code> header and routes to the correct backend — all through a single NodePort.</p>
+
+<div class="arch">
+<span class="c6">Browser</span>  →  http://<span class="c3">pyapp</span>.65.2.186.80.nip.io:<span class="c1">32606</span>
+              http://<span class="c4">unapp</span>.65.2.186.80.nip.io:<span class="c1">32606</span>
+              http://<span class="c5">petclinic</span>.65.2.186.80.nip.io:<span class="c1">32606</span>
+                         │
+                         ▼
+          <span class="c1">NGINX Ingress Controller</span>  (NodePort <span class="c1">32606</span>)
+          reads the HTTP Host: header
+                         │
+       ┌─────────────────┼──────────────────┬──────────────────┐
+       │                 │                  │                  │
+ Host: <span class="c3">pyapp.*</span>     Host: <span class="c4">unapp.*</span>     Host: <span class="c5">petclinic.*</span>  Host: <span class="c2">default.*</span>
+       │                 │                  │                  │
+       ▼                 ▼                  ▼                  ▼
+ <span class="c3">pyapp-svc</span>       <span class="c4">unapp-svc</span>       <span class="c5">petclinic-svc</span>   <span class="c2">default-backend</span>
+ (port 3000)     (port 80)       (port 8080)      (port 80)
+</div>
+
+<div class="sgrid">
+  <div class="scard"><div class="sl">Worker Node IP</div><div class="sv" style="color:var(--a1)">65.2.186.80</div></div>
+  <div class="scard"><div class="sl">NodePort</div><div class="sv" style="color:var(--a3)">32606 (HTTP)</div></div>
+  <div class="scard"><div class="sl">Routing Key</div><div class="sv" style="color:var(--a2)">HTTP Host header</div></div>
+  <div class="scard"><div class="sl">DNS</div><div class="sv" style="color:var(--a4)">nip.io wildcard</div></div>
+</div>
+
+<!-- STEP 1 — apps.yaml -->
+<div class="step">
+  <div class="step-hd">
+    <div class="snum">01</div>
+    <div>
+      <div class="s-title">Deploy Applications</div>
+      <div class="s-sub">apps.yaml — 4 deployments + 4 services</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>Create and apply <code>apps.yaml</code> containing all four application deployments and their ClusterIP services.</p>
+
+    <div class="file-label">apps.yaml</div>
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre><span class="cm"># ── Custom Default Backend ──────────────────────────────────────</span>
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">namespace</span>: <span class="val">default</span>
+  <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+  <span class="key">labels</span>:
+    <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+    <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+<span class="kw">spec</span>:
+  <span class="key">selector</span>:
+    <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+    <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">80</span>
+    <span class="key">name</span>: <span class="val">http</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">namespace</span>: <span class="val">default</span>
+  <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+  <span class="key">labels</span>:
+    <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+    <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">1</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+        <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+      - <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+        <span class="key">image</span>: <span class="val">lerndevops/samples:default-page</span>
+        <span class="key">ports</span>:
+        - <span class="key">containerPort</span>: <span class="val">80</span>
+        <span class="key">env</span>:
+        - <span class="key">name</span>: <span class="val">DEBUG</span>
+          <span class="key">value</span>: <span class="str">"false"</span>
+---
+<span class="cm"># ── pyapp (Python App — container port 3000) ────────────────────</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">pyapp</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">2</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app</span>: <span class="val">pyapp</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app</span>: <span class="val">pyapp</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+        - <span class="key">name</span>: <span class="val">pyapp</span>
+          <span class="key">image</span>: <span class="val">lerndevops/samples:pyapp</span>
+          <span class="key">ports</span>:
+            - <span class="key">containerPort</span>: <span class="val">3000</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">pyapp-svc</span>
+<span class="kw">spec</span>:
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">3000</span>
+  <span class="key">selector</span>:
+    <span class="key">app</span>: <span class="val">pyapp</span>
+---
+<span class="cm"># ── unapp (container port 80) ───────────────────────────────────</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">unapp</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">2</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app</span>: <span class="val">unapp</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app</span>: <span class="val">unapp</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+        - <span class="key">name</span>: <span class="val">unapp</span>
+          <span class="key">image</span>: <span class="val">lerndevops/samples:unapp</span>
+          <span class="key">ports</span>:
+            - <span class="key">containerPort</span>: <span class="val">80</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">unapp-svc</span>
+<span class="kw">spec</span>:
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">80</span>
+  <span class="key">selector</span>:
+    <span class="key">app</span>: <span class="val">unapp</span>
+---
+<span class="cm"># ── petclinic (Spring Boot — container port 8080) ───────────────</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">petclinic</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">2</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app</span>: <span class="val">petclinic</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app</span>: <span class="val">petclinic</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+        - <span class="key">name</span>: <span class="val">petclinic</span>
+          <span class="key">image</span>: <span class="val">lerndevops/samples:petclinic-v1</span>
+          <span class="key">ports</span>:
+            - <span class="key">containerPort</span>: <span class="val">8080</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">petclinic-svc</span>
+<span class="kw">spec</span>:
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">8080</span>
+  <span class="key">selector</span>:
+    <span class="key">app</span>: <span class="val">petclinic</span></pre>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — apply</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>kubectl apply -f apps.yaml
+kubectl get pods
+kubectl get svc</pre>
+    </div>
+
+    <div class="tw">
+      <table>
+        <tr><th>App</th><th>Image</th><th>Container Port</th><th>Service Port</th><th>Replicas</th></tr>
+        <tr><td>nginx-custom-default-backend</td><td>lerndevops/samples:default-page</td><td>80</td><td>80</td><td>1</td></tr>
+        <tr><td>pyapp</td><td>lerndevops/samples:pyapp</td><td>3000</td><td>80 → 3000</td><td>2</td></tr>
+        <tr><td>unapp</td><td>lerndevops/samples:unapp</td><td>80</td><td>80 → 80</td><td>2</td></tr>
+        <tr><td>petclinic</td><td>lerndevops/samples:petclinic-v1</td><td>8080</td><td>80 → 8080</td><td>2</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 2 — NGINX Controller -->
+<div class="step">
+  <div class="step-hd">
+    <div class="snum">02</div>
+    <div>
+      <div class="s-title">Install NGINX Ingress Controller</div>
+      <div class="s-sub">deploy.yaml from kubernetes community — creates controller in ingress-nginx namespace</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>This single command deploys the NGINX Ingress Controller, its ServiceAccount, ClusterRole, and a Service of type LoadBalancer in the <code>ingress-nginx</code> namespace.</p>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — install controller</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml
+
+<span class="cm"># Wait until the controller pod is Running</span>
+kubectl get pods -n ingress-nginx -w</pre>
+    </div>
+
+    <div class="alert warn">
+      <span class="ai">⚠</span>
+      <span>On <strong>AWS Academy accounts</strong>, LoadBalancer creation is blocked. The <code>ingress-nginx-controller</code> service will show <code>EXTERNAL-IP &lt;pending&gt;</code> permanently. Patch it to NodePort as shown below.</span>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — patch to NodePort (Academy accounts)</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>kubectl patch svc ingress-nginx-controller \
+  -n ingress-nginx \
+  -p '{"spec": {"type": "NodePort"}}'</pre>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — get NodePort number</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>kubectl get svc -n ingress-nginx ingress-nginx-controller
+
+<span class="cm"># Look for:  80:XXXXX/TCP  — that XXXXX is your NodePort</span>
+<span class="cm"># Example:   80:32606/TCP  → NodePort is 32606</span></pre>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — get worker node public IP</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>kubectl get nodes -o wide
+
+<span class="cm"># Look at the EXTERNAL-IP column</span>
+<span class="cm"># Example output:</span>
+<span class="cm"># NAME                                           EXTERNAL-IP</span>
+<span class="cm"># ip-192-168-7-124.ap-south-1.compute.internal   65.2.186.80   ← use this</span>
+<span class="cm"># ip-192-168-94-191.ap-south-1.compute.internal  43.205.93.11</span></pre>
+    </div>
+
+    <div class="alert note">
+      <span class="ai">ℹ</span>
+      <span>You have 2 worker nodes. Pick either public IP — NodePort is cluster-wide so traffic hitting any node gets routed to the correct pod automatically.</span>
+    </div>
+
+    <p>Open the NodePort in the EC2 Security Group for both worker nodes:</p>
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — open NodePort in Security Group</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre><span class="cm"># Get the Security Group IDs of both worker nodes</span>
+aws ec2 describe-instances \
+  --filters "Name=private-ip-address,Values=192.168.7.124" \
+  --query "Reservations[].Instances[].SecurityGroups" \
+  --region ap-south-1
+
+<span class="cm"># Add inbound rule (replace sg-xxxxxxxxx with actual SG ID)</span>
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-xxxxxxxxx \
+  --protocol tcp \
+  --port 32606 \
+  --cidr 0.0.0.0/0 \
+  --region ap-south-1
+
+<span class="cm"># Repeat for the second worker node SG</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3 — ingress-host.yaml -->
+<div class="step">
+  <div class="step-hd">
+    <div class="snum">03</div>
+    <div>
+      <div class="s-title">Create the Host-Based Ingress</div>
+      <div class="s-sub">ingress-host.yaml — the host: field per rule is what makes this host-based</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>Each rule has a <code>host:</code> field. NGINX reads the HTTP <code>Host</code> header from every incoming request and matches it against these hostnames to decide which backend to forward to.</p>
+
+    <div class="alert note">
+      <span class="ai">ℹ</span>
+      <span><strong>nip.io</strong> is a free public DNS service. Any hostname like <code>anything.YOUR_IP.nip.io</code> automatically resolves to <code>YOUR_IP</code>. No DNS configuration needed — just use the URL directly in your browser.</span>
+    </div>
+
+    <div class="file-label">ingress-host.yaml</div>
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre><span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">apps-host-ingress</span>
+  <span class="key">annotations</span>:
+    <span class="key">nginx.ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span>
+<span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">rules</span>:
+
+  <span class="cm">  # ── Default backend ──────────────────────────────────────</span>
+  - <span class="key">host</span>: <span class="str">"default.65.2.186.80.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+
+  <span class="cm">  # ── pyapp ─────────────────────────────────────────────────</span>
+  - <span class="key">host</span>: <span class="str">"pyapp.65.2.186.80.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">pyapp-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+
+  <span class="cm">  # ── unapp ─────────────────────────────────────────────────</span>
+  - <span class="key">host</span>: <span class="str">"unapp.65.2.186.80.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">unapp-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+
+  <span class="cm">  # ── petclinic ─────────────────────────────────────────────</span>
+  - <span class="key">host</span>: <span class="str">"petclinic.65.2.186.80.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">petclinic-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span></pre>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — apply</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>kubectl apply -f ingress-host.yaml
+
+<span class="cm"># Verify — HOSTS column should show all four nip.io hostnames</span>
+kubectl get ingress apps-host-ingress</pre>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 4 — Access -->
+<div class="step">
+  <div class="step-hd">
+    <div class="snum grn">04</div>
+    <div>
+      <div class="s-title">Access the Applications</div>
+      <div class="s-sub">Open in browser — always include the NodePort in the URL</div>
+    </div>
+  </div>
+  <div class="step-body">
+
+    <div class="alert warn">
+      <span class="ai">⚠</span>
+      <span>Always include <strong>:32606</strong> (your NodePort) in the URL. Without it the browser uses port 80 by default and the connection times out. Check your actual NodePort with <code>kubectl get svc -n ingress-nginx</code>.</span>
+    </div>
+
+    <div class="tw">
+      <table>
+        <tr><th>URL</th><th>Routes To</th><th>App</th></tr>
+        <tr><td>http://default.65.2.186.80.nip.io:32606</td><td>nginx-custom-default-backend</td><td><span class="tag p">default page</span></td></tr>
+        <tr><td>http://pyapp.65.2.186.80.nip.io:32606</td><td>pyapp-svc → pods :3000</td><td><span class="tag b">python app</span></td></tr>
+        <tr><td>http://unapp.65.2.186.80.nip.io:32606</td><td>unapp-svc → pods :80</td><td><span class="tag b">node app</span></td></tr>
+        <tr><td>http://petclinic.65.2.186.80.nip.io:32606</td><td>petclinic-svc → pods :8080</td><td><span class="tag y">spring boot</span></td></tr>
+      </table>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — verify with curl</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>curl -I http://pyapp.65.2.186.80.nip.io:32606
+curl -I http://unapp.65.2.186.80.nip.io:32606
+curl -I http://petclinic.65.2.186.80.nip.io:32606</pre>
+    </div>
+
+    <div class="alert ok">
+      <span class="ai">✓</span>
+      <span>Each URL hits the same IP and NodePort but gets a different application — because NGINX reads the <code>Host:</code> header and routes accordingly.</span>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 5 — DELETE yaml -->
+<div class="step">
+  <div class="step-hd">
+    <div class="snum red">05</div>
+    <div>
+      <div class="s-title">Delete All Resources</div>
+      <div class="s-sub">cleanup.yaml — single file to delete everything created in this lab</div>
+    </div>
+  </div>
+  <div class="step-body">
+    <p>You can delete everything using the same files you used to create them. <code>kubectl delete -f</code> reads the yaml and removes all matching resources.</p>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — delete all (recommended)</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre><span class="cm"># 1. Delete the Ingress rule</span>
+kubectl delete -f ingress-host.yaml
+
+<span class="cm"># 2. Delete all app deployments and services</span>
+kubectl delete -f apps.yaml
+
+<span class="cm"># 3. Delete the NGINX Ingress Controller (entire ingress-nginx namespace)</span>
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml</pre>
+    </div>
+
+    <p>Alternatively, create a single <code>cleanup.yaml</code> that deletes everything using <code>kubectl delete</code> in the right order:</p>
+
+    <div class="file-label">cleanup.yaml</div>
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">yaml — delete ingress rule + all apps</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre><span class="cm"># Delete the Ingress rule</span>
+<span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">apps-host-ingress</span>
+---
+<span class="cm"># Delete default backend service</span>
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+---
+<span class="cm"># Delete default backend deployment</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+---
+<span class="cm"># Delete pyapp</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">pyapp</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">pyapp-svc</span>
+---
+<span class="cm"># Delete unapp</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">unapp</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">unapp-svc</span>
+---
+<span class="cm"># Delete petclinic</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">petclinic</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">petclinic-svc</span></pre>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — apply cleanup.yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre>kubectl delete -f cleanup.yaml
+
+<span class="cm"># Then delete the NGINX controller separately</span>
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml</pre>
+    </div>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">bash — verify everything is gone</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+      <pre><span class="cm"># default namespace — should show only service/kubernetes</span>
+kubectl get all
+
+<span class="cm"># ingress-nginx namespace — should return "No resources found"</span>
+kubectl get all -n ingress-nginx
+
+<span class="cm"># No ingress rules should remain</span>
+kubectl get ingress</pre>
+    </div>
+
+    <div class="alert ok">
+      <span class="ai">✓</span>
+      <span>After cleanup, <code>kubectl get all</code> shows only <code>service/kubernetes</code>. The <code>ingress-nginx</code> namespace no longer exists.</span>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK REF -->
+<p class="sec-label" style="margin-top:8px;">// Quick Reference</p>
+<h2 class="sec-title">Path-Based vs Host-Based</h2>
+
+<div class="step">
+  <div class="step-body" style="padding-top:20px;">
+    <div class="tw">
+      <table>
+        <tr><th>Aspect</th><th>Path-Based</th><th>Host-Based (this lab)</th></tr>
+        <tr><td>URL format</td><td>65.2.186.80:32606/pyapp</td><td>pyapp.65.2.186.80.nip.io:32606</td></tr>
+        <tr><td>Ingress rule field</td><td>path: /pyapp</td><td>host: pyapp.65.2.186.80.nip.io</td></tr>
+        <tr><td>Routing decision</td><td>URL path segment</td><td>HTTP Host header</td></tr>
+        <tr><td>DNS needed</td><td>No</td><td>Yes (nip.io handles it for free)</td></tr>
+        <tr><td>rewrite-target needed</td><td>Yes (strips /pyapp prefix)</td><td>Optional (app always sees /)</td></tr>
+        <tr><td>Production preference</td><td>API versioning</td><td>Multi-app domains ✓</td></tr>
+      </table>
+    </div>
+
+    <div class="tw" style="margin-top:20px;">
+      <table>
+        <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+        <tr><td>ERR_CONNECTION_TIMED_OUT</td><td>NodePort missing from URL or SG blocked</td><td>Add :32606 to URL; open SG port</td></tr>
+        <tr><td>404 from NGINX</td><td>Host header doesn't match any rule</td><td>Check kubectl get ingress</td></tr>
+        <tr><td>EXTERNAL-IP pending</td><td>AWS Academy blocks ELB creation</td><td>Patch svc to NodePort</td></tr>
+        <tr><td>All hosts same app</td><td>Missing host: field in rules</td><td>Add host: to each rule</td></tr>
+        <tr><td>nip.io not resolving</td><td>Network blocks external DNS</td><td>Use /etc/hosts instead</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- end wrap -->
+
+<footer>Kubernetes Host-Based Ingress · EKS ap-south-1 · NGINX Ingress Controller v1.10.1</footer>
+
+<script>
+function cp(btn){
+  const pre=btn.closest('.cb').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(()=>{
+    btn.textContent='copied!';
+    btn.style.color='var(--a3)';
+    btn.style.borderColor='var(--a3)';
+    setTimeout(()=>{btn.textContent='copy';btn.style.color='';btn.style.borderColor='';},1800);
+  });
+}
+</script>
+</body>
+</html>

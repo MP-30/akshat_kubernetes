@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Ingress — Case Studies</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080d18;
+  --s1: #0d1322;
+  --s2: #121929;
+  --bd: #1a2640;
+  --a1: #38bdf8;
+  --a2: #818cf8;
+  --a3: #34d399;
+  --a4: #fb923c;
+  --a5: #f472b6;
+  --warn: #fbbf24;
+  --tx: #cbd5e1;
+  --tx2: #64748b;
+  --tx3: #94a3b8;
+  --white: #f1f5f9;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);line-height:1.7;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 10% 20%,rgba(56,189,248,0.03) 0%,transparent 45%),radial-gradient(circle at 90% 80%,rgba(129,140,248,0.03) 0%,transparent 45%);pointer-events:none;z-index:0;}
+
+/* HERO */
+.hero{position:relative;padding:64px 32px 44px;text-align:center;z-index:1;}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.22);color:var(--a3);font-family:var(--mono);font-size:0.67rem;letter-spacing:0.15em;padding:5px 14px;border-radius:2px;margin-bottom:18px;text-transform:uppercase;}
+.hero-badge .pulse{width:7px;height:7px;border-radius:50%;background:var(--a3);box-shadow:0 0 8px var(--a3);animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--a3);}50%{opacity:.5;box-shadow:0 0 3px var(--a3);}}
+h1{font-size:clamp(1.7rem,4vw,2.8rem);font-weight:700;line-height:1.12;letter-spacing:-0.03em;color:var(--white);margin-bottom:12px;}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--a3),var(--a1));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-sub{color:var(--tx2);font-size:0.9rem;max-width:500px;margin:0 auto;}
+
+/* META BAR */
+.metabar{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;padding:13px 24px;background:var(--s1);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);position:relative;z-index:1;}
+.mb-item{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:0.7rem;color:var(--tx2);}
+.mb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* WRAP */
+.wrap{max-width:900px;margin:0 auto;padding:52px 22px;position:relative;z-index:1;}
+
+/* CASE CARD */
+.case{background:var(--s1);border:1px solid var(--bd);border-radius:6px;margin-bottom:40px;overflow:hidden;position:relative;}
+.case-stripe{height:3px;}
+.case-stripe.c1{background:linear-gradient(90deg,var(--a1),var(--a2));}
+.case-stripe.c2{background:linear-gradient(90deg,var(--a3),var(--a1));}
+.case-stripe.c3{background:linear-gradient(90deg,var(--a4),var(--a5));}
+
+/* CASE HEADER */
+.case-hd{padding:22px 26px 18px;border-bottom:1px solid var(--bd);background:var(--s2);}
+.case-meta{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.case-num{font-family:var(--mono);font-size:0.68rem;color:var(--tx2);}
+.case-tag{font-family:var(--mono);font-size:0.66rem;padding:3px 9px;border-radius:3px;text-transform:uppercase;letter-spacing:0.1em;}
+.case-tag.t1{background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.2);color:var(--a1);}
+.case-tag.t2{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);color:var(--a3);}
+.case-tag.t3{background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.2);color:var(--a4);}
+.case-title{font-size:1.15rem;font-weight:700;color:var(--white);line-height:1.3;}
+
+/* SCENARIO */
+.scenario{padding:22px 26px;border-bottom:1px solid var(--bd);}
+.blk-label{font-family:var(--mono);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:8px;}
+.blk-label.blue{color:var(--a1);}
+.blk-label.green{color:var(--a3);}
+.blk-label.orange{color:var(--a4);}
+.blk-label.pink{color:var(--a5);}
+
+.scenario-text{color:var(--tx3);font-size:0.9rem;margin-bottom:14px;}
+.scenario-text strong{color:var(--white);}
+
+/* INFO CARDS (what they have) */
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0;}
+.info-card{background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:12px 14px;}
+.info-card .ic-label{font-family:var(--mono);font-size:0.62rem;color:var(--tx2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;}
+.info-card .ic-val{font-family:var(--mono);font-size:0.82rem;color:var(--white);}
+.info-card .ic-val.blue{color:var(--a1);}
+.info-card .ic-val.green{color:var(--a3);}
+.info-card .ic-val.orange{color:var(--a4);}
+
+/* TASKS */
+.tasks{padding:20px 26px;border-bottom:1px solid var(--bd);background:rgba(56,189,248,0.02);}
+.task-list{list-style:none;margin-top:10px;}
+.task-list li{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(26,38,64,0.5);font-size:0.88rem;color:var(--tx3);}
+.task-list li:last-child{border-bottom:none;}
+.task-num{font-family:var(--mono);font-size:0.72rem;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.2);color:var(--a1);padding:1px 7px;border-radius:3px;flex-shrink:0;margin-top:1px;}
+
+/* REVEAL BUTTON */
+.reveal-wrap{padding:18px 26px;text-align:center;}
+.reveal-btn{background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);color:var(--a3);font-family:var(--mono);font-size:0.75rem;padding:9px 22px;border-radius:4px;cursor:pointer;letter-spacing:0.08em;transition:all .2s;}
+.reveal-btn:hover{background:rgba(52,211,153,0.14);border-color:rgba(52,211,153,0.4);}
+.reveal-btn.active{background:rgba(248,113,113,0.07);border-color:rgba(248,113,113,0.25);color:#fca5a5;}
+
+/* SOLUTION */
+.solution{display:none;border-top:1px solid var(--bd);}
+.solution.open{display:block;}
+
+.sol-section{padding:22px 26px;border-bottom:1px solid var(--bd);}
+.sol-section:last-child{border-bottom:none;}
+
+.sol-section p{color:var(--tx3);font-size:0.88rem;margin-bottom:10px;}
+.sol-section p strong{color:var(--white);}
+.sol-section p:last-child{margin-bottom:0;}
+
+/* diagnosis steps */
+.diag-list{list-style:none;margin:10px 0;}
+.diag-list li{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(26,38,64,0.4);font-size:0.87rem;color:var(--tx3);}
+.diag-list li:last-child{border-bottom:none;}
+.diag-icon{flex-shrink:0;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-family:var(--mono);font-weight:600;margin-top:1px;}
+.diag-icon.root{background:rgba(248,113,113,0.15);color:#fca5a5;border:1px solid rgba(248,113,113,0.2);}
+.diag-icon.fix{background:rgba(52,211,153,0.12);color:var(--a3);border:1px solid rgba(52,211,153,0.2);}
+.diag-icon.step{background:rgba(56,189,248,0.1);color:var(--a1);border:1px solid rgba(56,189,248,0.18);font-size:0.65rem;}
+
+/* code */
+.cb{background:#040810;border:1px solid var(--bd);border-radius:4px;margin:10px 0;overflow:hidden;}
+.cb-hd{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;background:rgba(255,255,255,0.015);border-bottom:1px solid var(--bd);}
+.cb-lang{font-family:var(--mono);font-size:0.62rem;color:var(--tx2);text-transform:uppercase;letter-spacing:0.1em;}
+.cpbtn{background:none;border:1px solid var(--bd);color:var(--tx2);font-family:var(--mono);font-size:0.62rem;padding:2px 8px;border-radius:3px;cursor:pointer;transition:all .2s;}
+.cpbtn:hover{border-color:var(--a1);color:var(--a1);}
+pre{padding:14px 16px;font-family:var(--mono);font-size:0.78rem;line-height:1.68;color:#94a3b8;overflow-x:auto;}
+.kw{color:var(--a2);}
+.val{color:var(--a3);}
+.str{color:var(--warn);}
+.key{color:var(--a1);}
+.cm{color:#334466;font-style:italic;}
+.hl{color:#f87171;font-weight:600;}
+
+/* inline code */
+code{font-family:var(--mono);font-size:0.8em;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.14);padding:1px 5px;border-radius:3px;color:var(--a1);}
+
+/* hbox */
+.hbox{border-radius:0 4px 4px 0;padding:10px 14px;margin:10px 0;font-size:0.86rem;color:var(--tx3);}
+.hbox.note{background:rgba(56,189,248,0.05);border-left:3px solid var(--a1);}
+.hbox.note strong{color:var(--a1);}
+.hbox.ok{background:rgba(52,211,153,0.05);border-left:3px solid var(--a3);}
+.hbox.ok strong{color:var(--a3);}
+.hbox.warn{background:rgba(251,191,36,0.05);border-left:3px solid var(--warn);}
+.hbox.warn strong{color:var(--warn);}
+
+/* answer checklist */
+.cl{list-style:none;margin:8px 0;}
+.cl li{padding:4px 0 4px 22px;position:relative;color:var(--tx3);font-size:0.87rem;}
+.cl li::before{content:'✓';position:absolute;left:0;color:var(--a3);font-weight:700;font-size:0.8rem;}
+
+/* table */
+.tw{overflow-x:auto;margin:10px 0;}
+table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+th{background:var(--s2);padding:7px 12px;text-align:left;font-size:0.67rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--tx2);border-bottom:1px solid var(--bd);}
+td{padding:7px 12px;border-bottom:1px solid rgba(26,38,64,0.5);color:var(--tx3);font-family:var(--mono);font-size:0.75rem;}
+tr:last-child td{border-bottom:none;}
+
+footer{text-align:center;padding:36px 24px;color:var(--tx2);font-size:0.73rem;border-top:1px solid var(--bd);font-family:var(--mono);position:relative;z-index:1;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-badge"><span class="pulse"></span> Practice · Case Studies</div>
+  <h1>Kubernetes Ingress<br><em>Case Studies</em></h1>
+  <p class="hero-sub">Real-world scenarios to practice. Read the situation, attempt a solution, then reveal the answer.</p>
+</div>
+
+<div class="metabar">
+  <div class="mb-item"><span class="mb-dot" style="background:var(--a1);box-shadow:0 0 6px var(--a1)"></span>3 Scenarios</div>
+  <div class="mb-item"><span class="mb-dot" style="background:var(--a3);box-shadow:0 0 6px var(--a3)"></span>Read → Attempt → Reveal</div>
+  <div class="mb-item"><span class="mb-dot" style="background:var(--a4);box-shadow:0 0 6px var(--a4)"></span>Covers: Setup · Debugging · Design</div>
+</div>
+
+<div class="wrap">
+
+<!-- ═══════════════════════════════════════════
+     CASE STUDY 1
+════════════════════════════════════════════ -->
+<div class="case">
+  <div class="case-stripe c1"></div>
+
+  <div class="case-hd">
+    <div class="case-meta">
+      <span class="case-num">Case Study 01</span>
+      <span class="case-tag t1">Host-Based Routing</span>
+      <span class="case-tag t1">EKS Setup</span>
+    </div>
+    <div class="case-title">A startup wants to host three apps on one EKS cluster — each on its own subdomain</div>
+  </div>
+
+  <!-- SCENARIO -->
+  <div class="scenario">
+    <div class="blk-label blue">// Scenario</div>
+    <p class="scenario-text">
+      You are a DevOps engineer at a startup. The team has three applications ready to deploy on an EKS cluster in <strong>ap-south-1</strong>:
+    </p>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="ic-label">App 1</div>
+        <div class="ic-val blue">frontend</div>
+        <div class="ic-val" style="color:var(--tx2);font-size:0.72rem;margin-top:3px;">port 3000</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">App 2</div>
+        <div class="ic-val green">api-server</div>
+        <div class="ic-val" style="color:var(--tx2);font-size:0.72rem;margin-top:3px;">port 8080</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">App 3</div>
+        <div class="ic-val orange">admin-panel</div>
+        <div class="ic-val" style="color:var(--tx2);font-size:0.72rem;margin-top:3px;">port 80</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">Worker Node IP</div>
+        <div class="ic-val" style="color:var(--a5)">13.235.10.45</div>
+      </div>
+    </div>
+
+    <p class="scenario-text" style="margin-top:14px;">
+      The team wants users to access each app at its own subdomain — <strong>not</strong> via paths like <code>/frontend</code>. The account is an AWS Academy account. Services and Deployments are already created.
+    </p>
+  </div>
+
+  <!-- TASKS -->
+  <div class="tasks">
+    <div class="blk-label blue">// Your Tasks</div>
+    <ul class="task-list">
+      <li><span class="task-num">T1</span>What type of Ingress routing should be used — path-based or host-based? Why?</li>
+      <li><span class="task-num">T2</span>Write the complete <code>ingress.yaml</code> using <code>nip.io</code> hostnames for all three apps.</li>
+      <li><span class="task-num">T3</span>The NGINX Ingress Controller service is stuck at <code>EXTERNAL-IP &lt;pending&gt;</code>. What do you do?</li>
+      <li><span class="task-num">T4</span>After patching to NodePort, the NodePort assigned is <code>31080</code>. What URLs do users visit?</li>
+    </ul>
+  </div>
+
+  <div class="reveal-wrap">
+    <button class="reveal-btn" onclick="reveal(this, 'sol1')">▶ Reveal Solution</button>
+  </div>
+
+  <!-- SOLUTION -->
+  <div class="solution" id="sol1">
+
+    <div class="sol-section">
+      <div class="blk-label green">// T1 — Routing Type</div>
+      <p><strong>Host-based routing</strong> is the right choice here. The requirement is one subdomain per app (<code>frontend.domain.com</code>, <code>api.domain.com</code>) — not URL paths. Path-based would give <code>domain.com/frontend</code> which is not what the team wants.</p>
+      <div class="hbox note"><strong>Rule of thumb:</strong> If apps need their own domain/subdomain → host-based. If apps share one domain but differ by URL path → path-based.</div>
+    </div>
+
+    <div class="sol-section">
+      <div class="blk-label green">// T2 — ingress.yaml</div>
+      <p>Each rule gets a <code>host:</code> field with the nip.io hostname. All services use port 80 on the service side (services map internal ports to 80 externally).</p>
+      <div class="cb">
+        <div class="cb-hd"><span class="cb-lang">yaml — ingress.yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+        <pre><span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">startup-ingress</span>
+  <span class="key">annotations</span>:
+    <span class="key">nginx.ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span>
+<span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">rules</span>:
+
+  - <span class="key">host</span>: <span class="str">"frontend.13.235.10.45.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">frontend-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+
+  - <span class="key">host</span>: <span class="str">"api.13.235.10.45.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">api-server-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+
+  - <span class="key">host</span>: <span class="str">"admin.13.235.10.45.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">admin-panel-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span></pre>
+      </div>
+    </div>
+
+    <div class="sol-section">
+      <div class="blk-label green">// T3 — Fix EXTERNAL-IP Pending</div>
+      <p>AWS Academy accounts cannot create ELBs. The fix is to patch the Ingress Controller service from <code>LoadBalancer</code> to <code>NodePort</code>:</p>
+      <div class="cb">
+        <div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+        <pre>kubectl patch svc ingress-nginx-controller \
+  -n ingress-nginx \
+  -p '{"spec": {"type": "NodePort"}}'
+
+<span class="cm"># Confirm it's changed and note the NodePort</span>
+kubectl get svc -n ingress-nginx ingress-nginx-controller</pre>
+      </div>
+      <p>Also open the assigned NodePort in the EC2 Security Group of both worker nodes (inbound TCP rule).</p>
+    </div>
+
+    <div class="sol-section">
+      <div class="blk-label green">// T4 — Final Access URLs</div>
+      <p>With NodePort <code>31080</code>, users access apps at:</p>
+      <div class="tw">
+        <table>
+          <tr><th>App</th><th>URL</th></tr>
+          <tr><td>frontend</td><td>http://frontend.13.235.10.45.nip.io:31080</td></tr>
+          <tr><td>api-server</td><td>http://api.13.235.10.45.nip.io:31080</td></tr>
+          <tr><td>admin-panel</td><td>http://admin.13.235.10.45.nip.io:31080</td></tr>
+        </table>
+      </div>
+      <div class="hbox warn"><strong>Always include the NodePort</strong> in the URL. Without it, the browser defaults to port 80 and gets a connection timeout — the controller is not on port 80.</div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     CASE STUDY 2
+════════════════════════════════════════════ -->
+<div class="case">
+  <div class="case-stripe c2"></div>
+
+  <div class="case-hd">
+    <div class="case-meta">
+      <span class="case-num">Case Study 02</span>
+      <span class="case-tag t2">Debugging</span>
+      <span class="case-tag t2">Find the Bug</span>
+    </div>
+    <div class="case-title">A developer deployed an Ingress but every URL returns 404 or the wrong app</div>
+  </div>
+
+  <!-- SCENARIO -->
+  <div class="scenario">
+    <div class="blk-label green">// Scenario</div>
+    <p class="scenario-text">
+      A junior developer on your team set up host-based Ingress routing for two apps — <strong>blogapp</strong> and <strong>shopapp</strong> — on an EKS cluster. Worker node public IP is <code>52.66.18.90</code>, NodePort is <code>30500</code>.
+    </p>
+    <p class="scenario-text">
+      The developer says: <strong>"I visit <code>blogapp.52.66.18.90.nip.io:30500</code> and get 404. When I visit <code>shopapp.52.66.18.90.nip.io:30500</code> it loads blogapp instead of shopapp."</strong>
+    </p>
+    <p class="scenario-text">Here is the Ingress YAML the developer wrote. Find all the mistakes:</p>
+
+    <div class="cb">
+      <div class="cb-hd"><span class="cb-lang">yaml — buggy ingress (find the mistakes)</span></div>
+      <pre><span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">blog-shop-ingress</span>
+  <span class="key">annotations</span>:
+    <span class="hl">ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span>   <span class="cm">← Bug 1</span>
+<span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">rules</span>:
+  - <span class="hl">host: blogapp.52.66.18.90</span>              <span class="cm">← Bug 2</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">blog-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+  - <span class="key">http</span>:                                    <span class="cm">← Bug 3</span>
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">shop-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span></pre>
+    </div>
+  </div>
+
+  <!-- TASKS -->
+  <div class="tasks">
+    <div class="blk-label green">// Your Tasks</div>
+    <ul class="task-list">
+      <li><span class="task-num">T1</span>Identify all three bugs in the YAML above and explain what effect each one causes.</li>
+      <li><span class="task-num">T2</span>Write the corrected <code>ingress.yaml</code> with all bugs fixed.</li>
+      <li><span class="task-num">T3</span>What command would you run to verify the fix was applied and both hosts are registered?</li>
+    </ul>
+  </div>
+
+  <div class="reveal-wrap">
+    <button class="reveal-btn" onclick="reveal(this, 'sol2')">▶ Reveal Solution</button>
+  </div>
+
+  <!-- SOLUTION -->
+  <div class="solution" id="sol2">
+
+    <div class="sol-section">
+      <div class="blk-label green">// T1 — The Three Bugs</div>
+      <ul class="diag-list">
+        <li>
+          <span class="diag-icon root">✕</span>
+          <div>
+            <strong style="color:var(--white);font-size:0.88rem;">Bug 1 — Wrong annotation prefix</strong>
+            <div style="color:var(--tx3);font-size:0.85rem;margin-top:3px;">
+              <code>ingress.kubernetes.io/rewrite-target</code> is silently ignored by the NGINX controller.
+              The correct prefix is <code>nginx.ingress.kubernetes.io/rewrite-target</code>.
+              Effect: rewrite never happens — apps may receive wrong path prefixes.
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="diag-icon root">✕</span>
+          <div>
+            <strong style="color:var(--white);font-size:0.88rem;">Bug 2 — Missing .nip.io suffix</strong>
+            <div style="color:var(--tx3);font-size:0.85rem;margin-top:3px;">
+              <code>host: blogapp.52.66.18.90</code> is not a valid hostname that any DNS can resolve.
+              It should be <code>blogapp.52.66.18.90.nip.io</code>.
+              Effect: the browser sends the correct Host header but NGINX finds no matching rule → 404.
+            </div>
+          </div>
+        </li>
+        <li>
+          <span class="diag-icon root">✕</span>
+          <div>
+            <strong style="color:var(--white);font-size:0.88rem;">Bug 3 — Missing host: field for shopapp</strong>
+            <div style="color:var(--tx3);font-size:0.85rem;margin-top:3px;">
+              The second rule has no <code>host:</code> field at all. A rule without a host matches ALL incoming requests regardless of hostname.
+              Effect: any request that doesn't match the first rule falls through to shopapp — including requests meant for blogapp. This is why blogapp.nip.io also serves shopapp.
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="sol-section">
+      <div class="blk-label green">// T2 — Corrected ingress.yaml</div>
+      <div class="cb">
+        <div class="cb-hd"><span class="cb-lang">yaml — fixed</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+        <pre><span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">blog-shop-ingress</span>
+  <span class="key">annotations</span>:
+    <span class="key">nginx.ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span>   <span class="cm">✓ correct prefix</span>
+<span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">rules</span>:
+  - <span class="key">host</span>: <span class="str">"blogapp.52.66.18.90.nip.io"</span>           <span class="cm">✓ full nip.io hostname</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">blog-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+  - <span class="key">host</span>: <span class="str">"shopapp.52.66.18.90.nip.io"</span>           <span class="cm">✓ host: field added</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">shop-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span></pre>
+      </div>
+    </div>
+
+    <div class="sol-section">
+      <div class="blk-label green">// T3 — Verify the Fix</div>
+      <div class="cb">
+        <div class="cb-hd"><span class="cb-lang">bash</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+        <pre><span class="cm"># Apply the corrected file</span>
+kubectl apply -f ingress.yaml
+
+<span class="cm"># Check HOSTS column — both hostnames should appear</span>
+kubectl get ingress blog-shop-ingress
+
+<span class="cm"># Test each route manually using curl</span>
+curl -I http://blogapp.52.66.18.90.nip.io:30500
+curl -I http://shopapp.52.66.18.90.nip.io:30500
+
+<span class="cm"># Or test by sending the Host header directly to the IP</span>
+curl -v http://52.66.18.90:30500 -H "Host: blogapp.52.66.18.90.nip.io"
+curl -v http://52.66.18.90:30500 -H "Host: shopapp.52.66.18.90.nip.io"</pre>
+      </div>
+      <div class="hbox ok"><strong>Expected result:</strong> Both curls return HTTP 200. The <code>kubectl get ingress</code> HOSTS column shows both <code>blogapp.52.66.18.90.nip.io</code> and <code>shopapp.52.66.18.90.nip.io</code>.</div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     CASE STUDY 3
+════════════════════════════════════════════ -->
+<div class="case">
+  <div class="case-stripe c3"></div>
+
+  <div class="case-hd">
+    <div class="case-meta">
+      <span class="case-num">Case Study 03</span>
+      <span class="case-tag t3">Design Question</span>
+      <span class="case-tag t3">Mixed Routing</span>
+    </div>
+    <div class="case-title">Design an Ingress for an e-commerce platform with both host-based and path-based rules</div>
+  </div>
+
+  <!-- SCENARIO -->
+  <div class="scenario">
+    <div class="blk-label orange">// Scenario</div>
+    <p class="scenario-text">
+      You are setting up Ingress for an e-commerce company's EKS cluster. The platform has the following requirements from the product team:
+    </p>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="ic-label">Main store</div>
+        <div class="ic-val blue">store-svc</div>
+        <div class="ic-val" style="color:var(--tx2);font-size:0.72rem;margin-top:3px;">shop.mystore.com → /</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">API v1</div>
+        <div class="ic-val green">api-v1-svc</div>
+        <div class="ic-val" style="color:var(--tx2);font-size:0.72rem;margin-top:3px;">api.mystore.com/v1</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">API v2</div>
+        <div class="ic-val orange">api-v2-svc</div>
+        <div class="ic-val" style="color:var(--tx2);font-size:0.72rem;margin-top:3px;">api.mystore.com/v2</div>
+      </div>
+      <div class="info-card">
+        <div class="ic-label">Worker Node IP</div>
+        <div class="ic-val" style="color:var(--a5)">3.110.45.22</div>
+      </div>
+    </div>
+
+    <p class="scenario-text" style="margin-top:14px;">
+      Use <strong>nip.io</strong> in place of real DNS. The API has two versions running as separate deployments — both should be accessible under the same <code>api.*</code> hostname but different paths.
+    </p>
+  </div>
+
+  <!-- TASKS -->
+  <div class="tasks">
+    <div class="blk-label orange">// Your Tasks</div>
+    <ul class="task-list">
+      <li><span class="task-num">T1</span>Explain the routing design — which rules use host-based and which use path-based routing?</li>
+      <li><span class="task-num">T2</span>Write the complete <code>ingress.yaml</code> implementing all three routing rules.</li>
+      <li><span class="task-num">T3</span>What happens if a user visits <code>api.3.110.45.22.nip.io:NodePort/v3</code> — a path that has no rule? How would you handle this?</li>
+    </ul>
+  </div>
+
+  <div class="reveal-wrap">
+    <button class="reveal-btn" onclick="reveal(this, 'sol3')">▶ Reveal Solution</button>
+  </div>
+
+  <!-- SOLUTION -->
+  <div class="solution" id="sol3">
+
+    <div class="sol-section">
+      <div class="blk-label orange">// T1 — Routing Design</div>
+      <p>This scenario uses <strong style="color:var(--white)">both types of routing together</strong>:</p>
+      <div class="tw">
+        <table>
+          <tr><th>Rule</th><th>Hostname</th><th>Path</th><th>Type</th><th>Backend</th></tr>
+          <tr><td>1</td><td>shop.3.110.45.22.nip.io</td><td>/</td><td>Host-based</td><td>store-svc</td></tr>
+          <tr><td>2</td><td>api.3.110.45.22.nip.io</td><td>/v1</td><td>Host + Path</td><td>api-v1-svc</td></tr>
+          <tr><td>3</td><td>api.3.110.45.22.nip.io</td><td>/v2</td><td>Host + Path</td><td>api-v2-svc</td></tr>
+        </table>
+      </div>
+      <p>Rules 2 and 3 share the same <code>host:</code> value but differ by path. They are written as two entries under the same <code>host:</code> block. NGINX first matches the hostname, then matches the longer/more specific path.</p>
+    </div>
+
+    <div class="sol-section">
+      <div class="blk-label orange">// T2 — ingress.yaml</div>
+      <div class="cb">
+        <div class="cb-hd"><span class="cb-lang">yaml — ingress.yaml</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+        <pre><span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">ecommerce-ingress</span>
+  <span class="key">annotations</span>:
+    <span class="key">nginx.ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span>
+<span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">rules</span>:
+
+  <span class="cm">  # ── Main store (host-based only) ──────────────────────────</span>
+  - <span class="key">host</span>: <span class="str">"shop.3.110.45.22.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">store-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+
+  <span class="cm">  # ── API (host + path — both versions same hostname) ───────</span>
+  - <span class="key">host</span>: <span class="str">"api.3.110.45.22.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/v1</span>           <span class="cm"># api.nip.io/v1 → api-v1-svc</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">api-v1-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span>
+      - <span class="key">path</span>: <span class="val">/v2</span>           <span class="cm"># api.nip.io/v2 → api-v2-svc</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">api-v2-svc</span>
+            <span class="key">port</span>:
+              <span class="key">number</span>: <span class="val">80</span></pre>
+      </div>
+    </div>
+
+    <div class="sol-section">
+      <div class="blk-label orange">// T3 — Handling Unmatched Paths (/v3)</div>
+      <p>A request to <code>api.nip.io/v3</code> matches the <code>api.*</code> hostname but no path rule exists for <code>/v3</code>. NGINX returns <strong style="color:var(--white)">404 Not Found</strong>.</p>
+      <p>There are two clean ways to handle this:</p>
+      <ul class="cl">
+        <li><strong style="color:var(--white)">Option A — Add a catch-all path:</strong> Add a <code>path: /</code> rule at the end of the api host block pointing to a fallback or error service. Since NGINX prefers longer paths, <code>/v1</code> and <code>/v2</code> still win for their respective prefixes.</li>
+        <li><strong style="color:var(--white)">Option B — Use defaultBackend:</strong> Configure a global <code>defaultBackend</code> in the Ingress spec to catch anything that doesn't match any host or path rule.</li>
+      </ul>
+      <div class="cb">
+        <div class="cb-hd"><span class="cb-lang">yaml — Option A: catch-all path for unknown api versions</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+        <pre>  - <span class="key">host</span>: <span class="str">"api.3.110.45.22.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/v1</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>: {<span class="key">name</span>: <span class="val">api-v1-svc</span>, <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}}
+      - <span class="key">path</span>: <span class="val">/v2</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>: {<span class="key">name</span>: <span class="val">api-v2-svc</span>, <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}}
+      - <span class="key">path</span>: <span class="val">/</span>               <span class="cm"># catch-all — /v3, /v4, anything unknown</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>: {<span class="key">name</span>: <span class="val">api-v1-svc</span>, <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}}</pre>
+      </div>
+      <div class="hbox note"><strong>Path priority:</strong> NGINX always picks the longest matching path. <code>/v2</code> beats <code>/</code> for requests starting with <code>/v2</code>. The catch-all <code>/</code> only fires when nothing more specific matches.</div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- end wrap -->
+
+<footer>Kubernetes Ingress Case Studies · EKS ap-south-1 · NGINX Ingress Controller v1.10.1</footer>
+
+<script>
+function reveal(btn, id) {
+  const sol = document.getElementById(id);
+  const isOpen = sol.classList.contains('open');
+  sol.classList.toggle('open', !isOpen);
+  btn.textContent = isOpen ? '▶ Reveal Solution' : '▼ Hide Solution';
+  btn.classList.toggle('active', !isOpen);
+}
+function cp(btn) {
+  const pre = btn.closest('.cb').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--a3)';
+    btn.style.borderColor = 'var(--a3)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; btn.style.borderColor = ''; }, 1800);
+  });
+}
+</script>
+</body>
+</html>

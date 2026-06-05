@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understanding Kubernetes Ingress — Reading Material</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#faf8f3;
+  --paper:#ffffff;
+  --ink:#1a1a2e;
+  --ink2:#4a4a6a;
+  --ink3:#8888aa;
+  --rule:#e8e4da;
+  --accent:#c84b31;
+  --accent2:#2e5eaa;
+  --accent3:#1e8c5a;
+  --accent4:#7c3aed;
+  --accent5:#c45e00;
+  --hi-yellow:rgba(255,213,79,0.35);
+  --hi-green:rgba(52,211,153,0.2);
+  --hi-blue:rgba(56,189,248,0.18);
+  --hi-red:rgba(239,68,68,0.12);
+  --serif:'Lora',Georgia,serif;
+  --sans:'Outfit',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);line-height:1.85;font-size:17px;overflow-x:hidden;}
+
+/* grain texture */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;opacity:.4;}
+
+/* TOP STRIP */
+.top-strip{height:4px;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent3),var(--accent4));}
+
+/* HEADER */
+header{max-width:720px;margin:0 auto;padding:64px 32px 48px;position:relative;z-index:1;}
+.header-kicker{font-family:var(--sans);font-size:0.72rem;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.header-kicker::before{content:'';width:28px;height:1px;background:var(--accent);}
+h1{font-family:var(--serif);font-size:clamp(2rem,5vw,3rem);font-weight:700;line-height:1.15;color:var(--ink);margin-bottom:16px;letter-spacing:-0.01em;}
+.header-deck{font-family:var(--sans);font-size:1.05rem;color:var(--ink2);font-weight:300;max-width:580px;line-height:1.6;margin-bottom:28px;}
+.header-meta{display:flex;gap:20px;flex-wrap:wrap;font-family:var(--sans);font-size:0.78rem;color:var(--ink3);padding-top:20px;border-top:1px solid var(--rule);}
+.header-meta span{display:flex;align-items:center;gap:5px;}
+.header-meta span::before{content:'';width:5px;height:5px;border-radius:50%;}
+.header-meta span.s1::before{background:var(--accent);}
+.header-meta span.s2::before{background:var(--accent2);}
+.header-meta span.s3::before{background:var(--accent3);}
+
+/* TOC */
+.toc-wrap{max-width:720px;margin:0 auto;padding:0 32px 40px;position:relative;z-index:1;}
+.toc{background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:22px 26px;border-left:3px solid var(--accent2);}
+.toc-title{font-family:var(--sans);font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:var(--ink3);margin-bottom:12px;}
+.toc ol{padding-left:20px;}
+.toc ol li{margin-bottom:5px;}
+.toc ol li a{font-family:var(--sans);font-size:0.88rem;color:var(--accent2);text-decoration:none;font-weight:400;}
+.toc ol li a:hover{text-decoration:underline;}
+
+/* CONTENT */
+.content{max-width:720px;margin:0 auto;padding:0 32px 80px;position:relative;z-index:1;}
+
+/* CHAPTER */
+.chapter{margin-bottom:64px;}
+.ch-num{font-family:var(--sans);font-size:0.68rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px;}
+h2{font-family:var(--serif);font-size:1.75rem;font-weight:700;color:var(--ink);line-height:1.25;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid var(--ink);}
+h3{font-family:var(--serif);font-size:1.2rem;font-weight:600;color:var(--ink);margin:28px 0 12px;font-style:italic;}
+
+p{margin-bottom:18px;color:var(--ink2);}
+p strong{color:var(--ink);font-weight:600;}
+
+/* ANALOGY BLOCK */
+.analogy{background:var(--paper);border:1px solid var(--rule);border-radius:4px;margin:28px 0;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.05);}
+.analogy-header{background:var(--ink);padding:12px 20px;display:flex;align-items:center;gap:10px;}
+.analogy-header .a-icon{font-size:1.1rem;}
+.analogy-header .a-title{font-family:var(--sans);font-size:0.72rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:#fff;}
+.analogy-header .a-sub{font-family:var(--sans);font-size:0.72rem;color:rgba(255,255,255,0.5);margin-left:auto;}
+.analogy-body{padding:20px 22px;}
+.analogy-body p{font-size:0.95rem;margin-bottom:12px;}
+.analogy-body p:last-child{margin-bottom:0;}
+.analogy-body .real{font-family:var(--sans);font-size:0.82rem;background:var(--hi-yellow);border-radius:3px;padding:10px 14px;margin-top:12px;color:var(--ink);line-height:1.6;}
+.analogy-body .real strong{color:var(--accent);}
+
+/* COMPARE TABLE */
+.compare{width:100%;border-collapse:collapse;margin:20px 0;font-family:var(--sans);font-size:0.85rem;}
+.compare th{background:var(--ink);color:#fff;padding:10px 14px;text-align:left;font-weight:500;font-size:0.78rem;letter-spacing:0.05em;}
+.compare th:first-child{border-radius:4px 0 0 0;}
+.compare th:last-child{border-radius:0 4px 0 0;}
+.compare td{padding:10px 14px;border-bottom:1px solid var(--rule);color:var(--ink2);vertical-align:top;}
+.compare tr:last-child td{border-bottom:none;}
+.compare tr:nth-child(even) td{background:rgba(0,0,0,0.015);}
+.compare td strong{color:var(--ink);}
+
+/* HIGHLIGHT */
+mark{background:var(--hi-yellow);padding:1px 3px;border-radius:2px;color:var(--ink);}
+mark.blue{background:var(--hi-blue);}
+mark.green{background:var(--hi-green);}
+mark.red{background:var(--hi-red);}
+
+/* CALLOUT */
+.callout{margin:24px 0;padding:16px 20px;border-radius:0 4px 4px 0;font-family:var(--sans);font-size:0.9rem;line-height:1.65;}
+.callout.key{background:rgba(200,75,49,0.06);border-left:3px solid var(--accent);color:var(--ink2);}
+.callout.key strong{color:var(--accent);}
+.callout.info{background:rgba(46,94,170,0.06);border-left:3px solid var(--accent2);color:var(--ink2);}
+.callout.info strong{color:var(--accent2);}
+.callout.tip{background:rgba(30,140,90,0.06);border-left:3px solid var(--accent3);color:var(--ink2);}
+.callout.tip strong{color:var(--accent3);}
+
+/* CODE */
+.cb{background:#1a1a2e;border-radius:4px;margin:18px 0;overflow:hidden;}
+.cb-hd{display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.06);}
+.cb-lang{font-family:var(--sans);font-size:0.63rem;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.12em;}
+.cpbtn{background:none;border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.3);font-family:var(--sans);font-size:0.63rem;padding:2px 9px;border-radius:3px;cursor:pointer;transition:all .2s;}
+.cpbtn:hover{border-color:rgba(255,255,255,0.4);color:rgba(255,255,255,0.7);}
+pre{padding:16px 18px;font-family:'IBM Plex Mono','Courier New',monospace;font-size:0.8rem;line-height:1.7;color:#94a3b8;overflow-x:auto;}
+.kw{color:#a78bfa;}
+.val{color:#34d399;}
+.str{color:#fbbf24;}
+.key{color:#38bdf8;}
+.cm{color:#3d4f70;font-style:italic;}
+.hl{color:#f87171;}
+
+/* VISUAL DIAGRAM (pure CSS) */
+.diagram{background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:28px 24px;margin:24px 0;font-family:var(--sans);font-size:0.82rem;overflow-x:auto;}
+.diagram-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.15em;color:var(--ink3);margin-bottom:16px;font-weight:600;}
+.d-flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center;gap:4px;}
+.d-box{padding:10px 16px;border-radius:4px;text-align:center;font-size:0.78rem;font-weight:500;line-height:1.3;min-width:90px;}
+.d-box.internet{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;}
+.d-box.lb{background:#dbeafe;border:1px solid #3b82f6;color:#1e3a8a;}
+.d-box.nginx{background:#f3e8ff;border:1px solid #8b5cf6;color:#4c1d95;}
+.d-box.svc{background:#dcfce7;border:1px solid #22c55e;color:#14532d;}
+.d-box.pod{background:#fce7f3;border:1px solid #ec4899;color:#831843;}
+.d-arrow{color:var(--ink3);font-size:1.1rem;padding:0 4px;align-self:center;}
+.d-label{font-size:0.68rem;color:var(--ink3);text-align:center;margin-top:4px;}
+
+/* hotel diagram */
+.hotel{display:flex;flex-direction:column;gap:0;border:2px solid var(--ink);border-radius:6px;overflow:hidden;margin:20px 0;font-family:var(--sans);}
+.hotel-floor{padding:14px 18px;display:flex;align-items:flex-start;gap:14px;border-bottom:1px solid var(--rule);}
+.hotel-floor:last-child{border-bottom:none;}
+.floor-badge{flex-shrink:0;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;margin-top:2px;}
+.floor-badge.lobby{background:#fef3c7;color:#92400e;border:2px solid #f59e0b;}
+.floor-badge.rec{background:#dbeafe;color:#1e3a8a;border:2px solid #3b82f6;}
+.floor-badge.room{background:#dcfce7;color:#14532d;border:2px solid #22c55e;}
+.floor-badge.staff{background:#f3e8ff;color:#4c1d95;border:2px solid #8b5cf6;}
+.floor-content .floor-title{font-weight:600;font-size:0.9rem;color:var(--ink);margin-bottom:3px;}
+.floor-content .floor-desc{font-size:0.82rem;color:var(--ink2);line-height:1.5;}
+.floor-content .floor-mapping{font-size:0.78rem;font-family:'IBM Plex Mono','Courier New',monospace;background:var(--hi-yellow);padding:2px 6px;border-radius:3px;display:inline-block;margin-top:4px;color:var(--ink);}
+
+/* SUMMARY BOX */
+.summary{background:var(--ink);color:#fff;border-radius:4px;padding:24px 26px;margin:32px 0;}
+.summary-title{font-family:var(--sans);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.18em;color:rgba(255,255,255,0.4);margin-bottom:14px;font-weight:600;}
+.summary ul{list-style:none;padding:0;}
+.summary ul li{padding:6px 0 6px 20px;position:relative;font-family:var(--sans);font-size:0.88rem;color:rgba(255,255,255,0.75);border-bottom:1px solid rgba(255,255,255,0.06);}
+.summary ul li:last-child{border-bottom:none;}
+.summary ul li::before{content:'→';position:absolute;left:0;color:rgba(255,255,255,0.3);font-size:0.8rem;top:8px;}
+.summary ul li strong{color:#fff;}
+
+/* DIVIDER */
+.divider{border:none;border-top:1px solid var(--rule);margin:48px 0;}
+
+/* PULLQUOTE */
+.pullquote{margin:28px 0;padding:20px 24px;border-left:4px solid var(--accent);font-family:var(--serif);font-size:1.1rem;font-style:italic;color:var(--ink);line-height:1.6;background:rgba(200,75,49,0.04);}
+.pullquote cite{display:block;font-family:var(--sans);font-size:0.75rem;color:var(--ink3);font-style:normal;margin-top:8px;font-weight:500;letter-spacing:0.05em;}
+
+/* TERM */
+.term{border-bottom:2px dotted var(--accent2);cursor:help;color:var(--accent2);}
+
+/* inline code */
+code{font-family:'IBM Plex Mono','Courier New',monospace;font-size:0.82em;background:rgba(46,94,170,0.08);border:1px solid rgba(46,94,170,0.15);padding:1px 5px;border-radius:3px;color:var(--accent2);}
+
+footer{border-top:2px solid var(--ink);padding:32px;font-family:var(--sans);font-size:0.78rem;color:var(--ink3);max-width:720px;margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;position:relative;z-index:1;}
+</style>
+</head>
+<body>
+
+<div class="top-strip"></div>
+
+<header>
+  <div class="header-kicker">Reading Material · Kubernetes</div>
+  <h1>Understanding Kubernetes Ingress</h1>
+  <p class="header-deck">A complete conceptual guide using real-world analogies — from the problem Ingress solves, to how routing decisions are made, explained the way a person would explain it to a friend.</p>
+  <div class="header-meta">
+    <span class="s1">Concepts &amp; Analogies</span>
+    <span class="s2">Path vs Host Routing</span>
+    <span class="s3">EKS &amp; NodePort</span>
+  </div>
+</header>
+
+<div class="toc-wrap">
+  <div class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#ch1">The Problem — Why Ingress Exists</a></li>
+      <li><a href="#ch2">The Hotel Lobby Analogy</a></li>
+      <li><a href="#ch3">Ingress vs Ingress Controller</a></li>
+      <li><a href="#ch4">Path-Based Routing</a></li>
+      <li><a href="#ch5">Host-Based Routing</a></li>
+      <li><a href="#ch6">How NGINX Makes the Decision</a></li>
+      <li><a href="#ch7">The NodePort Workaround</a></li>
+      <li><a href="#ch8">Everything Together</a></li>
+    </ol>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ═══════════════════════════════
+     CHAPTER 1
+════════════════════════════════ -->
+<div class="chapter" id="ch1">
+  <div class="ch-num">Chapter 01</div>
+  <h2>The Problem — Why Ingress Exists</h2>
+
+  <p>Before we understand what Ingress <em>is</em>, we need to understand the problem it <em>solves</em>. Most technical concepts make much more sense once you feel the pain of not having them.</p>
+
+  <p>Imagine you are deploying three applications on a Kubernetes cluster — a user-facing website, an API, and an admin dashboard. Each of these needs to be accessible from the internet.</p>
+
+  <p>The naive solution in Kubernetes is to give each application a <strong>LoadBalancer Service</strong>. This works. Each service gets its own external IP address or DNS name, and traffic flows in. Problem solved, right?</p>
+
+  <p>Not quite. Here is what that looks like in the real world:</p>
+
+  <div class="diagram">
+    <div class="diagram-title">Without Ingress — One LoadBalancer Per App</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div style="text-align:center;">
+        <div class="d-box internet" style="margin:0 auto 6px;">Browser</div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box lb" style="margin:0 auto 6px;">ELB #1<br><span style="font-size:0.7rem;opacity:.7;">52.10.1.1</span></div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box svc" style="margin:0 auto 6px;">website-svc</div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box pod" style="margin:0 auto;">website pods</div>
+      </div>
+      <div style="text-align:center;">
+        <div class="d-box internet" style="margin:0 auto 6px;">Browser</div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box lb" style="margin:0 auto 6px;">ELB #2<br><span style="font-size:0.7rem;opacity:.7;">52.10.1.2</span></div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box svc" style="margin:0 auto 6px;">api-svc</div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box pod" style="margin:0 auto;">api pods</div>
+      </div>
+      <div style="text-align:center;">
+        <div class="d-box internet" style="margin:0 auto 6px;">Browser</div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box lb" style="margin:0 auto 6px;">ELB #3<br><span style="font-size:0.7rem;opacity:.7;">52.10.1.3</span></div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box svc" style="margin:0 auto 6px;">admin-svc</div>
+        <div class="d-arrow" style="display:block;text-align:center;">↓</div>
+        <div class="d-box pod" style="margin:0 auto;">admin pods</div>
+      </div>
+    </div>
+    <div style="font-family:var(--sans);font-size:0.78rem;color:var(--ink3);text-align:center;padding-top:12px;border-top:1px solid var(--rule);">3 apps = 3 Load Balancers = 3 bills on AWS, 3 different IPs for users to remember</div>
+  </div>
+
+  <p>This approach has three serious problems:</p>
+
+  <p><strong>Cost.</strong> Every LoadBalancer on AWS provisions an actual Elastic Load Balancer. Each one costs money — and the bill grows linearly with your number of applications. Ten microservices means ten ELBs.</p>
+
+  <p><strong>Complexity.</strong> Your users need to remember three different IP addresses or DNS names. Your SSL certificates need to be configured on each LoadBalancer separately. Your rate limiting, authentication middleware, logging — all duplicated.</p>
+
+  <p><strong>No smart routing.</strong> You can't say "requests to <code>/api</code> go here, requests to <code>/admin</code> go there" — each service is completely isolated.</p>
+
+  <div class="callout key">
+    <strong>The core insight:</strong> What if there was a single, smart entry point that received ALL incoming traffic and then decided — based on the URL — which application to forward it to? That is exactly what Ingress provides.
+  </div>
+
+  <p>With Ingress, the picture becomes dramatically simpler:</p>
+
+  <div class="diagram">
+    <div class="diagram-title">With Ingress — One Entry Point, Smart Routing</div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div class="d-box internet" style="display:inline-block;margin-bottom:6px;">Any Browser</div>
+      <div style="color:var(--ink3);font-size:1.1rem;">↓</div>
+      <div class="d-box lb" style="display:inline-block;margin-bottom:6px;">1 Entry Point<br><span style="font-size:0.7rem;opacity:.7;">one IP or NodePort</span></div>
+      <div style="color:var(--ink3);font-size:1.1rem;">↓</div>
+      <div class="d-box nginx" style="display:inline-block;margin-bottom:6px;">NGINX Ingress<br><span style="font-size:0.7rem;opacity:.7;">reads URL, decides backend</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div style="text-align:center;">
+        <div style="font-family:var(--sans);font-size:0.72rem;color:var(--ink3);margin-bottom:6px;">/website → </div>
+        <div class="d-box svc" style="margin:0 auto 6px;">website-svc</div>
+        <div style="color:var(--ink3);font-size:0.9rem;text-align:center;">↓</div>
+        <div class="d-box pod" style="margin:0 auto;">website pods</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-family:var(--sans);font-size:0.72rem;color:var(--ink3);margin-bottom:6px;">/api → </div>
+        <div class="d-box svc" style="margin:0 auto 6px;">api-svc</div>
+        <div style="color:var(--ink3);font-size:0.9rem;text-align:center;">↓</div>
+        <div class="d-box pod" style="margin:0 auto;">api pods</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-family:var(--sans);font-size:0.72rem;color:var(--ink3);margin-bottom:6px;">/admin → </div>
+        <div class="d-box svc" style="margin:0 auto 6px;">admin-svc</div>
+        <div style="color:var(--ink3);font-size:0.9rem;text-align:center;">↓</div>
+        <div class="d-box pod" style="margin:0 auto;">admin pods</div>
+      </div>
+    </div>
+    <div style="font-family:var(--sans);font-size:0.78rem;color:var(--ink3);text-align:center;padding-top:12px;border-top:1px solid var(--rule);margin-top:12px;">3 apps = 1 entry point = 1 bill, 1 IP for users, centralized control</div>
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════
+     CHAPTER 2
+════════════════════════════════ -->
+<div class="chapter" id="ch2">
+  <div class="ch-num">Chapter 02</div>
+  <h2>The Hotel Lobby Analogy</h2>
+
+  <p>The best way to truly understand Ingress is through an analogy. And there is no better analogy than a <strong>large hotel</strong>.</p>
+
+  <div class="pullquote">
+    Think of your Kubernetes cluster as a large hotel building. The hotel has many departments — a restaurant, a gym, a spa, room service, and hundreds of guest rooms. Guests arrive at one place: the front entrance.
+    <cite>— The Hotel Analogy</cite>
+  </div>
+
+  <p>Here is how every piece of the Ingress system maps to a hotel:</p>
+
+  <div class="hotel">
+    <div class="hotel-floor">
+      <div class="floor-badge lobby">🚪</div>
+      <div class="floor-content">
+        <div class="floor-title">The Front Entrance + Driveway</div>
+        <div class="floor-desc">All guests arrive here. There is only one entrance — one address you give people when they ask "where is the hotel?" In Kubernetes, this is your single <strong>IP address and port</strong>. One way in, for everyone.</div>
+        <div class="floor-mapping">= NodePort / LoadBalancer (the public IP:port)</div>
+      </div>
+    </div>
+    <div class="hotel-floor">
+      <div class="floor-badge rec">📋</div>
+      <div class="floor-content">
+        <div class="floor-title">The Receptionist at the Lobby Desk</div>
+        <div class="floor-desc">The receptionist greets every guest, checks what they want, reads their name/booking, and <em>decides where to send them</em>. "You booked the restaurant? Third floor. Gym? Basement. Room 402? Elevator on the right." The receptionist does not serve the food or operate the gym — they only <strong>route people to the right place</strong>.</div>
+        <div class="floor-mapping">= NGINX Ingress Controller (reads request, routes to right backend)</div>
+      </div>
+    </div>
+    <div class="hotel-floor">
+      <div class="floor-badge room">📖</div>
+      <div class="floor-content">
+        <div class="floor-title">The Hotel Rulebook at the Desk</div>
+        <div class="floor-desc">The receptionist doesn't memorize rules — they follow a written rulebook. "If guest says 'restaurant', send to floor 3. If guest says 'room service', call extension 4. If guest shows a booking for a suite, send to the executive floor." The rulebook tells the receptionist exactly what to do for each type of request.</div>
+        <div class="floor-mapping">= The Ingress YAML file (the routing rules you define)</div>
+      </div>
+    </div>
+    <div class="hotel-floor">
+      <div class="floor-badge staff">🍽️</div>
+      <div class="floor-content">
+        <div class="floor-title">The Individual Departments</div>
+        <div class="floor-desc">The restaurant, gym, spa, and guest rooms all operate independently. They don't care how guests found them — they just serve whoever shows up. Each department is only reachable through internal corridors, not directly from the street.</div>
+        <div class="floor-mapping">= Your backend Services and Pods (pyapp-svc, petclinic-svc etc.)</div>
+      </div>
+    </div>
+  </div>
+
+  <p>Now consider two ways a hotel receptionist might route guests:</p>
+
+  <h3>Path-Based Routing — "What do you want?"</h3>
+
+  <p>Imagine all guests arrive at the same hotel address. The receptionist looks at what they are <em>asking for</em> — the purpose of their visit — and routes accordingly:</p>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">🏨</span><span class="a-title">Hotel Analogy — Path-Based</span><span class="a-sub">Routing by purpose</span></div>
+    <div class="analogy-body">
+      <p>A guest walks in and says: <em>"I'm here for the restaurant."</em> — Receptionist: "Third floor, turn left."</p>
+      <p>Another guest: <em>"I need the gym."</em> — Receptionist: "Basement level, take the stairs."</p>
+      <p>Another: <em>"I want my room."</em> — Receptionist: "Room 402, elevator to floor 4."</p>
+      <p>All guests came through the same front door. The <strong>purpose they stated</strong> determines where they go.</p>
+      <div class="real"><strong>In Kubernetes:</strong> All requests arrive at the same IP. The <strong>URL path</strong> (<code>/restaurant</code>, <code>/gym</code>, <code>/api</code>) determines which backend service handles the request.</div>
+    </div>
+  </div>
+
+  <h3>Host-Based Routing — "Which hotel did you mean to visit?"</h3>
+
+  <p>Now imagine a hospitality company owns three separate hotel brands — a budget hotel, a business hotel, and a luxury resort — all operating from the same physical building complex. Each has its own branded entrance sign and its own service style. Guests arrive at the same physical address but announce <em>which brand</em> they are checking into:</p>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">🏨</span><span class="a-title">Hotel Analogy — Host-Based</span><span class="a-sub">Routing by brand/identity</span></div>
+    <div class="analogy-body">
+      <p>A guest walks in: <em>"I have a booking at Budget Inn."</em> — Receptionist routes to the budget wing.</p>
+      <p>Another: <em>"I'm checking into Grand Business Suites."</em> — Receptionist routes to the business wing.</p>
+      <p>Another: <em>"Royal Luxury Resort, my name is Singh."</em> — Receptionist routes to the luxury wing.</p>
+      <p>Same building, same entrance, but the <strong>brand name they state</strong> determines their entire experience.</p>
+      <div class="real"><strong>In Kubernetes:</strong> All requests arrive at the same IP. The <strong>Host header</strong> (<code>pyapp.example.com</code>, <code>petclinic.example.com</code>) sent by the browser determines which backend service handles the request.</div>
+    </div>
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════
+     CHAPTER 3
+════════════════════════════════ -->
+<div class="chapter" id="ch3">
+  <div class="ch-num">Chapter 03</div>
+  <h2>Ingress vs Ingress Controller</h2>
+
+  <p>This is one of the most common points of confusion for beginners. People apply their Ingress YAML, nothing works, and they don't understand why. The answer is almost always: <mark>the Ingress Controller was never installed.</mark></p>
+
+  <p>Kubernetes has a clear separation between <em>what you want</em> and <em>who does it</em>. The Ingress object describes what you want. The Ingress Controller is the software that actually does it.</p>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">🗺️</span><span class="a-title">Analogy — Rules vs Person</span><span class="a-sub">The policy and the enforcer</span></div>
+    <div class="analogy-body">
+      <p>Think of a traffic rulebook at a large junction. The rulebook says: "Red cars turn left. Blue cars go straight. Green cars take the flyover." The rules are written down, clear, and correct.</p>
+      <p>But if there is <strong>no traffic cop</strong> standing at the junction reading and enforcing those rules, cars just pile up in chaos. The rulebook alone does nothing.</p>
+      <div class="real">
+        <strong>Ingress YAML</strong> = The traffic rulebook. It defines the rules. By itself, it is just a config file stored in Kubernetes — it does nothing to actual traffic.<br><br>
+        <strong>Ingress Controller</strong> = The traffic cop. It reads the rulebook and physically routes packets to the correct destination. Without installing it, your Ingress rules are ignored.
+      </div>
+    </div>
+  </div>
+
+  <p>There is another important distinction: Kubernetes ships with many controllers built-in (for Deployments, Services, ConfigMaps) but it <strong>does not ship with an Ingress Controller</strong>. You must install one yourself. The most common choices are:</p>
+
+  <table class="compare">
+    <tr><th>Controller</th><th>Who Makes It</th><th>When to Use</th></tr>
+    <tr><td><strong>NGINX</strong></td><td>Kubernetes community</td><td>Most common, great for labs and production both</td></tr>
+    <tr><td><strong>AWS ALB Controller</strong></td><td>Amazon</td><td>EKS production — integrates with AWS ALB natively</td></tr>
+    <tr><td><strong>Traefik</strong></td><td>Traefik Labs</td><td>Good auto-discovery, popular with Docker Swarm backgrounds</td></tr>
+    <tr><td><strong>HAProxy</strong></td><td>HAProxy Technologies</td><td>High performance, fine-grained control needed</td></tr>
+  </table>
+
+  <p>In our lab we use the <strong>NGINX Ingress Controller</strong> installed from the official Kubernetes community manifest. Once installed, it runs as a pod inside your cluster in the <code>ingress-nginx</code> namespace and constantly watches for Ingress objects to process.</p>
+
+  <div class="callout info">
+    <strong>The ingressClassName field:</strong> Because a cluster can have multiple controllers installed simultaneously, the <code>ingressClassName: nginx</code> field in your Ingress YAML tells Kubernetes <em>which</em> controller should handle this particular Ingress object. Think of it as addressing your rulebook to the right traffic cop.
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════
+     CHAPTER 4
+════════════════════════════════ -->
+<div class="chapter" id="ch4">
+  <div class="ch-num">Chapter 04</div>
+  <h2>Path-Based Routing — Routing by URL</h2>
+
+  <p>Path-based routing is the simpler of the two routing types to understand. Every HTTP request has a URL. The URL has a <strong>path</strong> — the part after the domain name. For example, in <code>http://example.com/api/users</code>, the path is <code>/api/users</code>.</p>
+
+  <p>In path-based Ingress, you write rules that say: <em>"if the path starts with X, send the request to service Y."</em></p>
+
+  <div class="cb">
+    <div class="cb-hd"><span class="cb-lang">yaml — path-based ingress</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+    <pre><span class="kw">spec</span>:
+  <span class="key">rules</span>:
+  - <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/pyapp</span>        <span class="cm"># requests to /pyapp go to pyapp-svc</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">pyapp-svc</span>
+            <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}
+      - <span class="key">path</span>: <span class="val">/petclinic</span>    <span class="cm"># requests to /petclinic go to petclinic-svc</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">petclinic-svc</span>
+            <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}</pre>
+  </div>
+
+  <h3>The rewrite-target Problem</h3>
+
+  <p>Path-based routing introduces a subtle but important issue. When a user visits <code>mysite.com/pyapp/home</code>, NGINX forwards the full path including <code>/pyapp</code> to the backend. But the pyapp application was built to handle requests at <code>/</code> — it has no idea it's being served under <code>/pyapp</code>. So it gets a request for <code>/pyapp/home</code> and returns 404 because it only knows about <code>/home</code>.</p>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">📬</span><span class="a-title">Analogy — The Post Office</span><span class="a-sub">Address stripping</span></div>
+    <div class="analogy-body">
+      <p>Imagine a post office that sorts mail. A letter arrives addressed to "Building A, Department Finance, John Smith." The post office routes it to Building A. But when they hand it to John Smith inside the building, they just hand him the letter — they don't say "here's your letter that came via Building A, Department Finance." The routing prefix is stripped. John just sees his letter.</p>
+      <div class="real"><strong>rewrite-target: /</strong> does exactly this — it strips the routing prefix (<code>/pyapp</code>) before forwarding the request to the backend. The application receives a clean request at <code>/</code> and works normally.</div>
+    </div>
+  </div>
+
+  <div class="callout key">
+    <strong>Critical detail:</strong> The annotation must be <code>nginx.ingress.kubernetes.io/rewrite-target</code> — not <code>ingress.kubernetes.io/rewrite-target</code>. The NGINX controller only reads annotations with its own prefix. Using the wrong prefix means the annotation is silently ignored and the rewrite never happens.
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════
+     CHAPTER 5
+════════════════════════════════ -->
+<div class="chapter" id="ch5">
+  <div class="ch-num">Chapter 05</div>
+  <h2>Host-Based Routing — Routing by Hostname</h2>
+
+  <p>Every HTTP request carries a <strong>Host header</strong>. This is how the browser tells the server which website it's trying to reach. When you type <code>pyapp.example.com</code> into your browser, the browser performs a DNS lookup to find the IP address, connects to that IP, and then sends:</p>
+
+  <div class="cb">
+    <div class="cb-hd"><span class="cb-lang">http — raw request headers</span></div>
+    <pre>GET / HTTP/1.1
+<span class="hl">Host: pyapp.example.com</span>
+User-Agent: Mozilla/5.0 ...
+Accept: text/html ...</pre>
+  </div>
+
+  <p>Notice the <code>Host:</code> header. Even though the browser connected to the same IP address as <code>petclinic.example.com</code>, the Host header is different. This is the crucial information NGINX uses for host-based routing.</p>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">📞</span><span class="a-title">Analogy — The Call Centre</span><span class="a-sub">Same number, different departments</span></div>
+    <div class="analogy-body">
+      <p>A large company has one phone number — say 1800-COMPANY. When you call, an automated system answers and asks: <em>"Which department would you like? Press 1 for Sales, 2 for Support, 3 for Billing."</em></p>
+      <p>Everyone dials the same number. But what you <em>say or press</em> immediately determines who actually talks to you. The routing decision happens at the entry point based on your stated intent.</p>
+      <p>Now imagine instead of pressing numbers, callers simply <em>say the department name</em> — "Sales" or "Support" or "Billing." The system hears the word and routes accordingly.</p>
+      <div class="real"><strong>In host-based Ingress:</strong> Everyone connects to the same IP. But the <strong>Host header they send</strong> ("pyapp.example.com" or "petclinic.example.com") is the word they say. NGINX hears it and routes to the matching backend.</div>
+    </div>
+  </div>
+
+  <h3>What Changes in the YAML</h3>
+
+  <p>The only difference between path-based and host-based Ingress is the addition of a <code>host:</code> field in each rule. That single field changes the entire routing mechanism:</p>
+
+  <div class="cb">
+    <div class="cb-hd"><span class="cb-lang">yaml — host-based ingress</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+    <pre><span class="kw">spec</span>:
+  <span class="key">rules</span>:
+  <span class="cm">  # Without host: field = path-based (matches any hostname)</span>
+  <span class="cm">  # With host: field = host-based (only matches this hostname)</span>
+
+  - <span class="hl">host: "pyapp.65.2.186.80.nip.io"</span>   <span class="cm"># ← this is the only addition</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">pyapp-svc</span>
+            <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}
+
+  - <span class="hl">host: "petclinic.65.2.186.80.nip.io"</span>
+    <span class="key">http</span>:
+      <span class="key">paths</span>:
+      - <span class="key">path</span>: <span class="val">/</span>
+        <span class="key">pathType</span>: <span class="val">Prefix</span>
+        <span class="key">backend</span>:
+          <span class="key">service</span>:
+            <span class="key">name</span>: <span class="val">petclinic-svc</span>
+            <span class="key">port</span>: {<span class="key">number</span>: <span class="val">80</span>}</pre>
+  </div>
+
+  <h3>What is nip.io and Why Do We Use It?</h3>
+
+  <p>For host-based routing to work, the hostname in your browser must resolve to the IP of your Ingress Controller. In production, you would create a proper DNS A record pointing <code>pyapp.yourcompany.com</code> to your load balancer IP.</p>
+
+  <p>In a lab, setting up a real DNS server is unnecessarily complex. <strong>nip.io</strong> solves this elegantly — it is a free public DNS service with a simple rule:</p>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">🌐</span><span class="a-title">How nip.io Works</span><span class="a-sub">Magic wildcard DNS</span></div>
+    <div class="analogy-body">
+      <p>Any hostname of the form <code>anything.IP_ADDRESS.nip.io</code> automatically resolves to that IP address. No account, no configuration, no DNS record creation — it just works.</p>
+      <p><code>pyapp.65.2.186.80.nip.io</code> → resolves to → <code>65.2.186.80</code></p>
+      <p><code>petclinic.65.2.186.80.nip.io</code> → resolves to → <code>65.2.186.80</code></p>
+      <p>Both resolve to the same IP — but the <strong>hostname the browser sends in the Host header is different</strong>. That difference is exactly what NGINX uses to route to the right backend.</p>
+      <div class="real"><strong>nip.io solves the DNS problem</strong> so you can practice host-based routing in any lab environment without needing a domain name or DNS server.</div>
+    </div>
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════
+     CHAPTER 6
+════════════════════════════════ -->
+<div class="chapter" id="ch6">
+  <div class="ch-num">Chapter 06</div>
+  <h2>How NGINX Makes the Routing Decision</h2>
+
+  <p>Understanding the exact order in which NGINX evaluates rules will save you hours of debugging. There is a precise priority system.</p>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">🔍</span><span class="a-title">Analogy — The Airport Check-In Counter</span><span class="a-sub">Priority-based sorting</span></div>
+    <div class="analogy-body">
+      <p>At a busy airport, passengers approach a long check-in counter. The counter has sections labeled by airline and destination. A staff member at the entrance applies a strict priority system:</p>
+      <p><strong>First:</strong> They check if the passenger has a booking for a specific airline — this is like the <code>host:</code> field. If they match, the passenger is directed to that airline's section.</p>
+      <p><strong>Second:</strong> Within that section, they look at the destination city — this is like the <code>path:</code>. A passenger going to Delhi gets one queue, someone going to Mumbai gets another. <em>More specific destinations win</em> — a passenger with "Delhi, Terminal 2, Gate 14" goes to a more specific counter than one just saying "Delhi."</p>
+      <p><strong>Third:</strong> If nobody recognizes the passenger at all, they go to a general information desk — this is the <code>defaultBackend</code>.</p>
+    </div>
+  </div>
+
+  <p>In precise technical terms, NGINX evaluates every incoming request as follows:</p>
+
+  <table class="compare">
+    <tr><th>Step</th><th>NGINX Does</th><th>What Wins</th></tr>
+    <tr><td><strong>1</strong></td><td>Finds all rules where the <code>host:</code> field matches the request's Host header</td><td>Exact match wins over wildcard match</td></tr>
+    <tr><td><strong>2</strong></td><td>Among matching host rules, finds paths that match the request URL</td><td>Longer/more specific path wins over shorter path</td></tr>
+    <tr><td><strong>3</strong></td><td>If no rule matches at all</td><td>defaultBackend serves it, or 404 if none configured</td></tr>
+  </table>
+
+  <p>A practical example of path specificity — imagine these three rules all under the same host:</p>
+
+  <div class="cb">
+    <div class="cb-hd"><span class="cb-lang">yaml — path specificity example</span></div>
+    <pre><span class="key">paths</span>:
+- <span class="key">path</span>: <span class="val">/</span>           <span class="cm"># matches everything — least specific</span>
+  <span class="key">backend</span>: default-svc
+- <span class="key">path</span>: <span class="val">/api</span>        <span class="cm"># matches /api and /api/* — more specific</span>
+  <span class="key">backend</span>: api-svc
+- <span class="key">path</span>: <span class="val">/api/v2</span>     <span class="cm"># matches /api/v2/* — most specific</span>
+  <span class="key">backend</span>: api-v2-svc</pre>
+  </div>
+
+  <p>A request to <code>/api/v2/users</code> will be handled by <code>api-v2-svc</code> — because <code>/api/v2</code> is a longer, more specific match than <code>/api</code> which is more specific than <code>/</code>. The most specific path always wins.</p>
+
+  <div class="callout tip">
+    <strong>Useful debugging trick:</strong> Use <code>curl -v http://IP:NodePort -H "Host: pyapp.example.com"</code> to manually set the Host header. This bypasses DNS entirely and lets you test if NGINX routing is working correctly, independent of whether DNS resolves properly.
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════
+     CHAPTER 7
+════════════════════════════════ -->
+<div class="chapter" id="ch7">
+  <div class="ch-num">Chapter 07</div>
+  <h2>The NodePort Workaround on AWS Academy</h2>
+
+  <p>When you install the NGINX Ingress Controller on EKS using the standard manifest, it creates a Service of type <code>LoadBalancer</code>. In a normal AWS account, this automatically provisions an Elastic Load Balancer and gives the controller a public IP.</p>
+
+  <p>AWS Academy accounts, however, restrict ELB creation. The service stays stuck showing <code>EXTERNAL-IP &lt;pending&gt;</code> forever, and the event log shows a clear error:</p>
+
+  <div class="cb">
+    <div class="cb-hd"><span class="cb-lang">error message</span></div>
+    <pre>OperationNotPermitted: This AWS account currently does not support
+creating load balancers.</pre>
+  </div>
+
+  <div class="analogy">
+    <div class="analogy-header"><span class="a-icon">🏢</span><span class="a-title">Analogy — Building with No Main Door</span><span class="a-sub">Using the service entrance instead</span></div>
+    <div class="analogy-body">
+      <p>Imagine a hotel building where the main entrance was locked and the management won't open it (that's AWS Academy blocking LoadBalancer creation). The hotel still functions perfectly — all the departments, rooms, and services work fine. You just can't use the main entrance.</p>
+      <p>But there is a side door — the service entrance — that is always open. It's not as elegant (visitors have to remember a specific door number), but it leads to the same lobby, the same receptionist, and the same routing system.</p>
+      <div class="real"><strong>NodePort is the service entrance.</strong> Instead of a clean DNS name from an ELB, visitors use the worker node's raw public IP and a specific port number (32606). Less elegant, but functionally identical — traffic still reaches the NGINX controller and all routing works exactly the same.</div>
+    </div>
+  </div>
+
+  <p>The fix is a simple one-line patch:</p>
+
+  <div class="cb">
+    <div class="cb-hd"><span class="cb-lang">bash — patch service to NodePort</span><button class="cpbtn" onclick="cp(this)">copy</button></div>
+    <pre>kubectl patch svc ingress-nginx-controller \
+  -n ingress-nginx \
+  -p '{"spec": {"type": "NodePort"}}'</pre>
+  </div>
+
+  <p>After patching, Kubernetes assigns a port from the range <strong>30000–32767</strong> (for example, 32606). This port is opened on every worker node in the cluster — so hitting any worker node's public IP on that port reaches the NGINX controller.</p>
+
+  <div class="callout key">
+    <strong>Always include the NodePort in your URL.</strong> When browsers see a URL like <code>http://pyapp.65.2.186.80.nip.io</code> with no port, they default to port 80. Your NGINX controller is not on port 80 — it's on 32606 (or whatever was assigned). This is why the browser shows a timeout: the packet arrives at port 80, nothing is listening, the connection is refused or dropped. Always use <code>http://pyapp.65.2.186.80.nip.io:32606</code>.
+  </div>
+
+  <p>One more thing: AWS Security Groups block all inbound traffic by default. After patching to NodePort, you must explicitly open that port in the EC2 worker node's Security Group, or the traffic never reaches the node at all — producing another timeout with no helpful error message.</p>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════
+     CHAPTER 8
+════════════════════════════════ -->
+<div class="chapter" id="ch8">
+  <div class="ch-num">Chapter 08</div>
+  <h2>Everything Together — The Full Picture</h2>
+
+  <p>Now that every concept is clear, let us walk through exactly what happens — from the moment you type a URL in your browser to the moment your application's response appears on screen.</p>
+
+  <p>Assume the URL is <code>http://pyapp.65.2.186.80.nip.io:32606</code>.</p>
+
+  <table class="compare">
+    <tr><th>Step</th><th>What Happens</th><th>Where</th></tr>
+    <tr><td><strong>1</strong></td><td>Browser parses the URL. Sees hostname <code>pyapp.65.2.186.80.nip.io</code>, port <code>32606</code>.</td><td>Your browser</td></tr>
+    <tr><td><strong>2</strong></td><td>Browser queries DNS for <code>pyapp.65.2.186.80.nip.io</code>. nip.io answers: <code>65.2.186.80</code>.</td><td>Public DNS (nip.io)</td></tr>
+    <tr><td><strong>3</strong></td><td>Browser opens a TCP connection to <code>65.2.186.80:32606</code>.</td><td>Network</td></tr>
+    <tr><td><strong>4</strong></td><td>EC2 Security Group checks: is port 32606 allowed inbound? If yes, packet reaches the node.</td><td>AWS Security Group</td></tr>
+    <tr><td><strong>5</strong></td><td>NodePort 32606 on the worker node receives the packet. Kubernetes routes it to the NGINX Ingress Controller pod.</td><td>EKS cluster</td></tr>
+    <tr><td><strong>6</strong></td><td>NGINX reads the HTTP request. Finds the <code>Host: pyapp.65.2.186.80.nip.io</code> header.</td><td>NGINX pod</td></tr>
+    <tr><td><strong>7</strong></td><td>NGINX checks its rules (loaded from your Ingress YAML). Finds matching rule: host = pyapp.* → backend = pyapp-svc.</td><td>NGINX pod</td></tr>
+    <tr><td><strong>8</strong></td><td>NGINX forwards the request to pyapp-svc (ClusterIP). Service load-balances to one of the pyapp pods.</td><td>Kubernetes networking</td></tr>
+    <tr><td><strong>9</strong></td><td>pyapp pod processes the request and sends a response back through the same chain.</td><td>pyapp pod</td></tr>
+    <tr><td><strong>10</strong></td><td>Your browser displays the page.</td><td>Your browser</td></tr>
+  </table>
+
+  <p>Notice that the backend services (pyapp-svc, petclinic-svc) are all ClusterIP type — they are not exposed to the internet at all. Only the NGINX Ingress Controller is externally accessible. All other services are purely internal, reachable only by NGINX. This is also a significant <strong>security benefit</strong> of using Ingress.</p>
+
+  <div class="summary">
+    <div class="summary-title">Key Takeaways</div>
+    <ul>
+      <li><strong>Ingress solves</strong> the problem of needing one LoadBalancer per application — a single entry point handles all traffic.</li>
+      <li><strong>The Ingress object</strong> is just a YAML config file — it defines rules but does nothing by itself.</li>
+      <li><strong>The Ingress Controller</strong> is the running software (a pod) that reads those rules and routes actual network traffic.</li>
+      <li><strong>Path-based routing</strong> uses the URL path (<code>/api</code>, <code>/admin</code>) as the routing key. More specific paths always win.</li>
+      <li><strong>Host-based routing</strong> uses the HTTP Host header as the routing key — one IP can serve dozens of distinct domains.</li>
+      <li><strong>rewrite-target</strong> strips the path prefix before forwarding to the backend, so apps don't need to know they're behind a proxy.</li>
+      <li><strong>nip.io</strong> provides free wildcard DNS for labs — any <code>subdomain.IP.nip.io</code> resolves to that IP, enabling host-based routing without real DNS setup.</li>
+      <li><strong>NodePort</strong> is the workaround when LoadBalancer is unavailable — functionally identical, just accessed via node IP + port number instead of a clean DNS name.</li>
+    </ul>
+  </div>
+
+</div>
+
+</div><!-- end content -->
+
+<footer>
+  <span>Kubernetes Ingress — Reading Material</span>
+  <span>NGINX Ingress Controller v1.10.1 · EKS ap-south-1</span>
+</footer>
+
+<script>
+function cp(btn){
+  const pre=btn.closest('.cb').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(()=>{
+    btn.textContent='copied!';
+    setTimeout(()=>{btn.textContent='copy';},1800);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Ingress on EKS — Lab Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #0f1526;
+    --surface2: #151c35;
+    --border: #1e2a4a;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --code-bg: #060a14;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    padding: 80px 40px 60px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -100px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(0,212,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    padding: 6px 16px;
+    border-radius: 2px;
+    margin-bottom: 24px;
+    text-transform: uppercase;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+  }
+
+  .hero h1 span {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    color: var(--muted);
+    font-size: 1.05rem;
+    max-width: 560px;
+    margin: 0 auto 40px;
+  }
+
+  /* Meta strip */
+  .meta-strip {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    flex-wrap: wrap;
+    padding: 20px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  .meta-item .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: 0 0 8px var(--accent3);
+    flex-shrink: 0;
+  }
+
+  .meta-item .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+
+  /* Layout */
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 60px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Section header */
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  /* Step cards */
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 40px;
+    overflow: hidden;
+    position: relative;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .step::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .step-num {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #000;
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .step-subtitle {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .step-body {
+    padding: 24px 28px;
+  }
+
+  .step-body p {
+    color: #94a3b8;
+    margin-bottom: 16px;
+    font-size: 0.95rem;
+  }
+
+  /* Code blocks */
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 16px 0;
+    overflow: hidden;
+  }
+
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .code-lang {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  pre {
+    padding: 20px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: #cbd5e1;
+  }
+
+  /* Syntax-like coloring */
+  .kw { color: #7c3aed; }
+  .val { color: #10b981; }
+  .str { color: #f59e0b; }
+  .cm { color: #475569; font-style: italic; }
+  .key { color: #00d4ff; }
+
+  /* Info boxes */
+  .info-box {
+    display: flex;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 4px;
+    margin: 16px 0;
+    font-size: 0.88rem;
+  }
+
+  .info-box.note {
+    background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.2);
+    color: #7dd3fc;
+  }
+
+  .info-box.warn {
+    background: rgba(245,158,11,0.06);
+    border: 1px solid rgba(245,158,11,0.2);
+    color: #fcd34d;
+  }
+
+  .info-box.error {
+    background: rgba(239,68,68,0.06);
+    border: 1px solid rgba(239,68,68,0.25);
+    color: #fca5a5;
+  }
+
+  .info-box.success {
+    background: rgba(16,185,129,0.06);
+    border: 1px solid rgba(16,185,129,0.2);
+    color: #6ee7b7;
+  }
+
+  .info-box-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    margin: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 2;
+    color: #64748b;
+    overflow-x: auto;
+  }
+
+  .arch-diagram .hl { color: var(--accent); }
+  .arch-diagram .hl2 { color: var(--accent2); }
+  .arch-diagram .hl3 { color: var(--accent3); }
+  .arch-diagram .hl4 { color: var(--warn); }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.87rem;
+  }
+
+  th {
+    background: var(--surface2);
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(30,42,74,0.6);
+    color: #94a3b8;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .tag.green { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+  .tag.red { background: rgba(239,68,68,0.15); color: #fca5a5; }
+  .tag.blue { background: rgba(0,212,255,0.1); color: #7dd3fc; }
+  .tag.yellow { background: rgba(245,158,11,0.12); color: #fcd34d; }
+
+  /* h2 section titles */
+  .section-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    color: #fff;
+  }
+
+  /* inline code */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.15);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+
+  ul.checklist {
+    list-style: none;
+    margin: 12px 0;
+  }
+
+  ul.checklist li {
+    padding: 6px 0;
+    padding-left: 28px;
+    position: relative;
+    color: #94a3b8;
+    font-size: 0.9rem;
+  }
+
+  ul.checklist li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--accent3);
+    font-weight: 700;
+  }
+
+  /* Summary card */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .summary-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px;
+  }
+
+  .summary-card .s-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .summary-card .s-val {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .summary-card .s-val.accent { color: var(--accent); }
+  .summary-card .s-val.green { color: var(--accent3); }
+  .summary-card .s-val.warn { color: var(--warn); }
+  .summary-card .s-val.purple { color: #a78bfa; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">EKS Lab Guide · Kubernetes Ingress</div>
+  <h1>NGINX Ingress Controller<br><span>on Amazon EKS</span></h1>
+  <p class="hero-sub">A complete hands-on lab covering multi-path routing, AWS limitations, and NodePort workarounds for Academy accounts.</p>
+</div>
+
+<div class="meta-strip">
+  <div class="meta-item"><span class="dot"></span> Platform: Amazon EKS (ap-south-1)</div>
+  <div class="meta-item"><span class="dot"></span> Ingress: nginx v1.10.1</div>
+  <div class="meta-item"><span class="dot warn"></span> AWS Academy: LoadBalancer restricted</div>
+  <div class="meta-item"><span class="dot"></span> Workaround: NodePort access</div>
+</div>
+
+<div class="container">
+
+  <!-- OVERVIEW -->
+  <p class="section-label">// Overview</p>
+  <h2 class="section-title">What We Are Building</h2>
+
+  <p style="color:#94a3b8; margin-bottom:24px; font-size:0.95rem;">
+    In this lab we deploy three sample applications on EKS, expose them through a single NGINX Ingress Controller using path-based routing, and learn how to work around AWS Academy account restrictions that block Load Balancer creation.
+  </p>
+
+  <div class="arch-diagram">
+<span class="hl">Internet / Browser</span>
+       │
+       │  http://&lt;node-ip&gt;:32606/
+       ▼
+<span class="hl2">EC2 Worker Node (NodePort 32606)</span>
+       │
+       ▼
+<span class="hl">NGINX Ingress Controller Pod</span>
+       │
+       ├──  /           ──►  <span class="hl3">nginx-custom-default-backend</span>  (port 80)
+       │
+       ├──  /pyapp      ──►  <span class="hl3">pyapp-svc</span>     (pod port 3000)
+       │
+       ├──  /unapp      ──►  <span class="hl3">unapp-svc</span>     (pod port 80)
+       │
+       └──  /petclinic  ──►  <span class="hl4">petclinic-svc</span> (pod port 8080)
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="s-label">Applications</div>
+      <div class="s-val accent">4 services</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Routing Type</div>
+      <div class="s-val purple">Path-Based</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Ingress Class</div>
+      <div class="s-val accent">nginx</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-label">Access Method</div>
+      <div class="s-val warn">NodePort (Academy)</div>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">01</div>
+      <div>
+        <div class="step-title">Deploy Applications — apps.yaml</div>
+        <div class="step-subtitle">Deploy 3 sample apps + custom default backend + their Services</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>Create <code>apps.yaml</code> with all four deployments and their corresponding ClusterIP services. Each app runs as 2 replicas (except the default backend with 1).</p>
+
+      <div class="info-box note">
+        <span class="info-box-icon">ℹ</span>
+        <span>The <strong>default backend</strong> serves all unmatched routes (the <code>/</code> path). The three apps — pyapp, unapp, petclinic — each listen on different container ports.</span>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">yaml — apps.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre><span class="cm"># ── Custom Default Backend ──────────────────────────────</span>
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">namespace</span>: <span class="val">default</span>
+  <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+  <span class="key">labels</span>:
+    <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+    <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+<span class="kw">spec</span>:
+  <span class="key">selector</span>:
+    <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+    <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">80</span>
+    <span class="key">name</span>: <span class="val">http</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">namespace</span>: <span class="val">default</span>
+  <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+  <span class="key">labels</span>:
+    <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+    <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">1</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app.kubernetes.io/name</span>: <span class="val">nginx-custom-default-backend</span>
+        <span class="key">app.kubernetes.io/part-of</span>: <span class="val">ingress-nginx</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+      - <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+        <span class="key">image</span>: <span class="val">lerndevops/samples:default-page</span>
+        <span class="key">ports</span>:
+        - <span class="key">containerPort</span>: <span class="val">80</span>
+        <span class="key">env</span>:
+        - <span class="key">name</span>: <span class="val">DEBUG</span>
+          <span class="key">value</span>: <span class="str">"false"</span>
+---
+<span class="cm"># ── pyapp (Python App — container port 3000) ────────────</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">pyapp</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">2</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app</span>: <span class="val">pyapp</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app</span>: <span class="val">pyapp</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+        - <span class="key">name</span>: <span class="val">pyapp</span>
+          <span class="key">image</span>: <span class="val">lerndevops/samples:pyapp</span>
+          <span class="key">ports</span>:
+            - <span class="key">containerPort</span>: <span class="val">3000</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">pyapp-svc</span>
+<span class="kw">spec</span>:
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">3000</span>
+  <span class="key">selector</span>:
+    <span class="key">app</span>: <span class="val">pyapp</span>
+---
+<span class="cm"># ── unapp (container port 80) ───────────────────────────</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">unapp</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">2</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app</span>: <span class="val">unapp</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app</span>: <span class="val">unapp</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+        - <span class="key">name</span>: <span class="val">unapp</span>
+          <span class="key">image</span>: <span class="val">lerndevops/samples:unapp</span>
+          <span class="key">ports</span>:
+            - <span class="key">containerPort</span>: <span class="val">80</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">unapp-svc</span>
+<span class="kw">spec</span>:
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">80</span>
+  <span class="key">selector</span>:
+    <span class="key">app</span>: <span class="val">unapp</span>
+---
+<span class="cm"># ── petclinic (Spring Boot — container port 8080) ───────</span>
+<span class="kw">apiVersion</span>: <span class="val">apps/v1</span>
+<span class="kw">kind</span>: <span class="val">Deployment</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">petclinic</span>
+<span class="kw">spec</span>:
+  <span class="key">replicas</span>: <span class="val">2</span>
+  <span class="key">selector</span>:
+    <span class="key">matchLabels</span>:
+      <span class="key">app</span>: <span class="val">petclinic</span>
+  <span class="key">template</span>:
+    <span class="key">metadata</span>:
+      <span class="key">labels</span>:
+        <span class="key">app</span>: <span class="val">petclinic</span>
+    <span class="key">spec</span>:
+      <span class="key">containers</span>:
+        - <span class="key">name</span>: <span class="val">petclinic</span>
+          <span class="key">image</span>: <span class="val">lerndevops/samples:petclinic-v1</span>
+          <span class="key">ports</span>:
+            - <span class="key">containerPort</span>: <span class="val">8080</span>
+---
+<span class="kw">apiVersion</span>: <span class="val">v1</span>
+<span class="kw">kind</span>: <span class="val">Service</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">petclinic-svc</span>
+<span class="kw">spec</span>:
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="val">80</span>
+    <span class="key">targetPort</span>: <span class="val">8080</span>
+  <span class="key">selector</span>:
+    <span class="key">app</span>: <span class="val">petclinic</span></pre>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <tr><th>App</th><th>Image</th><th>Container Port</th><th>Service Port</th><th>Replicas</th></tr>
+          <tr><td>nginx-custom-default-backend</td><td>lerndevops/samples:default-page</td><td>80</td><td>80</td><td>1</td></tr>
+          <tr><td>pyapp</td><td>lerndevops/samples:pyapp</td><td>3000</td><td>80 → 3000</td><td>2</td></tr>
+          <tr><td>unapp</td><td>lerndevops/samples:unapp</td><td>80</td><td>80 → 80</td><td>2</td></tr>
+          <tr><td>petclinic</td><td>lerndevops/samples:petclinic-v1</td><td>8080</td><td>80 → 8080</td><td>2</td></tr>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash — apply</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre>kubectl apply -f apps.yaml
+kubectl get pods
+kubectl get svc</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">02</div>
+      <div>
+        <div class="step-title">Install NGINX Ingress Controller</div>
+        <div class="step-subtitle">Installs the controller that reads Ingress rules and routes traffic</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>Without an Ingress Controller, the Ingress resource is just a config object — nothing actually routes traffic. On EKS we use the official NGINX Ingress Controller from the Kubernetes community.</p>
+
+      <div class="info-box note">
+        <span class="info-box-icon">ℹ</span>
+        <span>This single command deploys the controller pods, ClusterRole, ServiceAccount, and a <strong>Service of type LoadBalancer</strong> in the <code>ingress-nginx</code> namespace.</span>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre>kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml</pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash — verify</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre><span class="cm"># Wait for the controller pod to be Running</span>
+kubectl get pods -n ingress-nginx
+
+<span class="cm"># Check the service — EXTERNAL-IP will show pending on Academy accounts</span>
+kubectl get svc -n ingress-nginx</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">03</div>
+      <div>
+        <div class="step-title">Create the Ingress Resource — app-nginx.yaml</div>
+        <div class="step-subtitle">Define path-based routing rules for all four services</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>The Ingress object tells NGINX which backend service to forward requests to based on the URL path. It uses <code>ingressClassName: nginx</code> to bind to our controller.</p>
+
+      <div class="info-box warn">
+        <span class="info-box-icon">⚠</span>
+        <span><strong>Annotation fix required:</strong> Use <code>nginx.ingress.kubernetes.io/rewrite-target</code> — NOT <code>ingress.kubernetes.io/rewrite-target</code>. The wrong prefix is silently ignored.</span>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">yaml — app-nginx.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre><span class="kw">apiVersion</span>: <span class="val">networking.k8s.io/v1</span>
+<span class="kw">kind</span>: <span class="val">Ingress</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="val">apps-ingress-rule</span>
+  <span class="key">annotations</span>:
+    <span class="key">nginx.ingress.kubernetes.io/rewrite-target</span>: <span class="val">/</span>
+<span class="kw">spec</span>:
+  <span class="key">ingressClassName</span>: <span class="val">nginx</span>
+  <span class="key">rules</span>:
+  - <span class="key">http</span>:
+      <span class="key">paths</span>:
+        - <span class="key">path</span>: <span class="val">/</span>
+          <span class="key">pathType</span>: <span class="val">Prefix</span>
+          <span class="key">backend</span>:
+            <span class="key">service</span>:
+              <span class="key">name</span>: <span class="val">nginx-custom-default-backend</span>
+              <span class="key">port</span>:
+                <span class="key">number</span>: <span class="val">80</span>
+        - <span class="key">path</span>: <span class="val">/unapp</span>
+          <span class="key">pathType</span>: <span class="val">Prefix</span>
+          <span class="key">backend</span>:
+            <span class="key">service</span>:
+              <span class="key">name</span>: <span class="val">unapp-svc</span>
+              <span class="key">port</span>:
+                <span class="key">number</span>: <span class="val">80</span>
+        - <span class="key">path</span>: <span class="val">/pyapp</span>
+          <span class="key">pathType</span>: <span class="val">Prefix</span>
+          <span class="key">backend</span>:
+            <span class="key">service</span>:
+              <span class="key">name</span>: <span class="val">pyapp-svc</span>
+              <span class="key">port</span>:
+                <span class="key">number</span>: <span class="val">80</span>
+        - <span class="key">path</span>: <span class="val">/petclinic</span>
+          <span class="key">pathType</span>: <span class="val">Prefix</span>
+          <span class="key">backend</span>:
+            <span class="key">service</span>:
+              <span class="key">name</span>: <span class="val">petclinic-svc</span>
+              <span class="key">port</span>:
+                <span class="key">number</span>: <span class="val">80</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash — apply</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre>kubectl apply -f app-nginx.yaml
+kubectl get ingress</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 — PROBLEM -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">04</div>
+      <div>
+        <div class="step-title">Problem: EXTERNAL-IP stays &lt;pending&gt;</div>
+        <div class="step-subtitle">AWS Academy accounts cannot create Load Balancers</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>After installing the controller, you'll notice the <code>ingress-nginx-controller</code> service stays in <code>&lt;pending&gt;</code> state for EXTERNAL-IP. Checking the events reveals the root cause:</p>
+
+      <div class="info-box error">
+        <span class="info-box-icon">✕</span>
+        <div>
+          <strong>Error from kubectl describe svc:</strong><br><br>
+          <code style="font-size:0.78rem; color:#fca5a5; background:transparent; border:none; padding:0;">
+            OperationNotPermitted: This AWS account currently does not support creating load balancers.
+          </code>
+        </div>
+      </div>
+
+      <p>This is an <strong>AWS account-level restriction</strong>, not an IAM or Kubernetes problem. AWS Academy / Learner Lab / Sandbox accounts have ELB service disabled. No IAM policy fix will resolve this.</p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash — diagnose</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre><span class="cm"># Check svc status</span>
+kubectl get svc -n ingress-nginx
+
+<span class="cm"># See the actual AWS error</span>
+kubectl describe svc ingress-nginx-controller -n ingress-nginx | tail -20</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 — WORKAROUND -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">05</div>
+      <div>
+        <div class="step-title">Workaround: Switch to NodePort</div>
+        <div class="step-subtitle">Access the Ingress Controller directly via EC2 worker node public IP</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>Since we can't create an ELB, we patch the controller's service from <code>LoadBalancer</code> to <code>NodePort</code>. Traffic then enters via the worker node's public IP on the auto-assigned NodePort.</p>
+
+      <div class="info-box success">
+        <span class="info-box-icon">✓</span>
+        <span>NodePort range is 30000–32767. The port <code>32606</code> is already assigned to HTTP — check your cluster's actual port with <code>kubectl get svc</code>.</span>
+      </div>
+
+      <p><strong>Step 5a — Patch the service to NodePort:</strong></p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre>kubectl patch svc ingress-nginx-controller \
+  -n ingress-nginx \
+  -p '{"spec": {"type": "NodePort"}}'</pre>
+      </div>
+
+      <p><strong>Step 5b — Note the assigned NodePort:</strong></p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre>kubectl get svc -n ingress-nginx ingress-nginx-controller
+<span class="cm"># Look for: 80:XXXXX/TCP  ← that XXXXX is your NodePort</span></pre>
+      </div>
+
+      <p><strong>Step 5c — Get the worker node public IP:</strong></p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre>aws ec2 describe-instances \
+  --filters "Name=private-ip-address,Values=192.168.7.124" \
+  --query "Reservations[].Instances[].PublicIpAddress" \
+  --region ap-south-1</pre>
+      </div>
+
+      <p><strong>Step 5d — Open the NodePort in the EC2 Security Group:</strong></p>
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre><span class="cm"># Find the worker node Security Group ID</span>
+aws ec2 describe-instances \
+  --filters "Name=private-ip-address,Values=192.168.7.124" \
+  --query "Reservations[].Instances[].SecurityGroups" \
+  --region ap-south-1
+
+<span class="cm"># Add inbound rule for the NodePort</span>
+aws ec2 authorize-security-group-ingress \
+  --group-id &lt;sg-xxxxxxxxx&gt; \
+  --protocol tcp \
+  --port 32606 \
+  --cidr 0.0.0.0/0 \
+  --region ap-south-1</pre>
+      </div>
+
+      <div class="info-box warn">
+        <span class="info-box-icon">⚠</span>
+        <span>Without opening this port in the Security Group, the browser will show <strong>ERR_CONNECTION_TIMED_OUT</strong> — the connection simply drops. This is not an application error.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6 — ACCESS -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">06</div>
+      <div>
+        <div class="step-title">Access Your Applications</div>
+        <div class="step-subtitle">Open in browser using worker node public IP + NodePort</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>Once the Security Group is updated, all four paths are accessible:</p>
+
+      <div class="table-wrap">
+        <table>
+          <tr><th>URL</th><th>Routes To</th><th>Status</th></tr>
+          <tr>
+            <td>http://&lt;node-ip&gt;:32606/</td>
+            <td>nginx-custom-default-backend</td>
+            <td><span class="tag green">default page</span></td>
+          </tr>
+          <tr>
+            <td>http://&lt;node-ip&gt;:32606/pyapp</td>
+            <td>pyapp-svc → pyapp pods (port 3000)</td>
+            <td><span class="tag blue">python app</span></td>
+          </tr>
+          <tr>
+            <td>http://&lt;node-ip&gt;:32606/unapp</td>
+            <td>unapp-svc → unapp pods (port 80)</td>
+            <td><span class="tag blue">node app</span></td>
+          </tr>
+          <tr>
+            <td>http://&lt;node-ip&gt;:32606/petclinic</td>
+            <td>petclinic-svc → petclinic pods (port 8080)</td>
+            <td><span class="tag yellow">spring boot</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash — test with curl</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre>curl -I http://&lt;node-ip&gt;:32606/
+curl -I http://&lt;node-ip&gt;:32606/pyapp
+curl -I http://&lt;node-ip&gt;:32606/unapp
+curl -I http://&lt;node-ip&gt;:32606/petclinic</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7 — CLEANUP -->
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num">07</div>
+      <div>
+        <div class="step-title">Cleanup — Delete Everything</div>
+        <div class="step-subtitle">Remove all resources from the cluster</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>Always clean up after a lab to avoid leftover resources consuming cluster capacity.</p>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="code-lang">bash</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre><span class="cm"># Delete apps and ingress rule</span>
+kubectl delete -f apps.yaml
+kubectl delete -f app-nginx.yaml
+
+<span class="cm"># Delete the NGINX Ingress Controller (entire namespace)</span>
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.1/deploy/static/provider/aws/deploy.yaml
+
+<span class="cm"># Verify everything is gone</span>
+kubectl get all
+kubectl get all -n ingress-nginx
+kubectl get ingress</pre>
+      </div>
+
+      <div class="info-box success">
+        <span class="info-box-icon">✓</span>
+        <span>After cleanup, <code>kubectl get all</code> should show only the <code>service/kubernetes</code> entry. The <code>ingress-nginx</code> namespace should no longer exist.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONCEPTS -->
+  <p class="section-label" style="margin-top:20px;">// Key Concepts</p>
+  <h2 class="section-title">What You Learned</h2>
+
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num" style="background: linear-gradient(135deg,#10b981,#059669);">★</div>
+      <div>
+        <div class="step-title">Ingress vs Service</div>
+        <div class="step-subtitle">Why Ingress exists and what problem it solves</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>Without Ingress, each app needs its own LoadBalancer Service = one ELB per app = expensive. Ingress consolidates all routing through <strong>one entry point</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Without Ingress</th><th>With Ingress</th></tr>
+          <tr><td>3 apps = 3 LoadBalancers</td><td>3 apps = 1 LoadBalancer (or NodePort)</td></tr>
+          <tr><td>3 different IPs/ports for users</td><td>1 IP, paths differentiate apps</td></tr>
+          <tr><td>No URL-based routing</td><td>Full path/host-based routing</td></tr>
+          <tr><td>TLS on each service separately</td><td>TLS terminated once at Ingress</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num" style="background: linear-gradient(135deg,#10b981,#059669);">★</div>
+      <div>
+        <div class="step-title">rewrite-target Annotation</div>
+        <div class="step-subtitle">Why the annotation prefix matters</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p>When a user hits <code>/pyapp</code>, NGINX needs to forward just <code>/</code> to the backend — most apps don't know they're served under a subpath. <code>rewrite-target: /</code> strips the path prefix.</p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Annotation</th><th>Result</th></tr>
+          <tr><td><code>nginx.ingress.kubernetes.io/rewrite-target: /</code></td><td><span class="tag green">Correct — NGINX reads it</span></td></tr>
+          <tr><td><code>ingress.kubernetes.io/rewrite-target: /</code></td><td><span class="tag red">Wrong prefix — silently ignored</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-header">
+      <div class="step-num" style="background: linear-gradient(135deg,#10b981,#059669);">★</div>
+      <div>
+        <div class="step-title">LoadBalancer vs NodePort on EKS Academy</div>
+        <div class="step-subtitle">When and why to use each</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="table-wrap">
+        <table>
+          <tr><th>Service Type</th><th>Real AWS Account</th><th>AWS Academy</th></tr>
+          <tr>
+            <td>LoadBalancer</td>
+            <td><span class="tag green">Works — creates ELB</span></td>
+            <td><span class="tag red">Blocked — OperationNotPermitted</span></td>
+          </tr>
+          <tr>
+            <td>NodePort</td>
+            <td><span class="tag green">Works</span></td>
+            <td><span class="tag green">Works — use this</span></td>
+          </tr>
+        </table>
+      </div>
+      <ul class="checklist" style="margin-top:16px;">
+        <li>NodePort exposes a port in range 30000–32767 on every worker node</li>
+        <li>Traffic hits <code>node-public-ip:nodeport</code> and reaches the NGINX controller</li>
+        <li>NGINX then routes to the correct backend based on the URL path</li>
+        <li>Security Group must explicitly allow the NodePort — default blocks all</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- TROUBLESHOOTING -->
+  <p class="section-label" style="margin-top:20px;">// Troubleshooting</p>
+  <h2 class="section-title">Common Issues & Fixes</h2>
+
+  <div class="step">
+    <div class="step-body" style="padding-top:20px;">
+      <div class="table-wrap">
+        <table>
+          <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+          <tr>
+            <td>EXTERNAL-IP &lt;pending&gt;</td>
+            <td>Academy account can't create ELB</td>
+            <td>Patch svc to NodePort</td>
+          </tr>
+          <tr>
+            <td>ERR_CONNECTION_TIMED_OUT</td>
+            <td>NodePort blocked by Security Group</td>
+            <td>Add inbound rule for the port</td>
+          </tr>
+          <tr>
+            <td>404 Not Found from NGINX</td>
+            <td>Ingress rule not matching or rewrite wrong</td>
+            <td>Check annotation prefix and path</td>
+          </tr>
+          <tr>
+            <td>503 Service Unavailable</td>
+            <td>App pods not Running or Service selector mismatch</td>
+            <td><code>kubectl get pods</code>, check labels</td>
+          </tr>
+          <tr>
+            <td>Ingress has no ADDRESS</td>
+            <td>No Ingress Controller installed</td>
+            <td>Apply the NGINX controller manifest</td>
+          </tr>
+          <tr>
+            <td>rewrite not working</td>
+            <td>Wrong annotation prefix</td>
+            <td>Use <code>nginx.ingress.kubernetes.io/</code></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="code-block" style="margin-top:20px;">
+        <div class="code-header">
+          <span class="code-lang">bash — debug commands</span>
+          <button class="copy-btn" onclick="copyCode(this)">copy</button>
+        </div>
+        <pre><span class="cm"># Check ingress controller logs</span>
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller --tail=50
+
+<span class="cm"># Check ingress resource details</span>
+kubectl describe ingress apps-ingress-rule
+
+<span class="cm"># Check all pods are Running</span>
+kubectl get pods -o wide
+
+<span class="cm"># Check services and endpoints</span>
+kubectl get svc
+kubectl get endpoints</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Kubernetes Ingress on EKS · Lab Guide · NGINX v1.10.1 · ap-south-1
+</footer>
+
+<script>
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  const text = pre.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--accent3)';
+    btn.style.borderColor = 'var(--accent3)';
+    setTimeout(() => {
+      btn.textContent = 'copy';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 1800);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes — Init Containers Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --blue-border: #bfdbfe;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --green-border: #bbf7d0;
+    --orange: #ea580c;
+    --orange-light: #fff7ed;
+    --orange-border: #fed7aa;
+    --purple: #7c3aed;
+    --purple-light: #faf5ff;
+    --purple-border: #ddd6fe;
+    --code-bg: #1e293b;
+    --step-size: 32px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* TOP BANNER */
+  .banner {
+    background: var(--blue);
+    color: white;
+    text-align: center;
+    padding: 14px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  .banner strong { font-weight: 700; }
+
+  /* PAGE */
+  .page { max-width: 800px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  /* HEADER */
+  .header { text-align: center; margin-bottom: 40px; }
+
+  .header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .header h1 span { color: var(--blue); }
+
+  .header p { color: var(--muted); font-size: 15px; }
+
+  .pill-row {
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 10px;
+    margin-top: 16px;
+  }
+
+  .pill {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 14px;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* GOAL BOX */
+  .goal-box {
+    background: var(--blue-light);
+    border: 1px solid var(--blue-border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 36px;
+  }
+
+  .goal-box h3 {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--blue);
+    margin-bottom: 14px;
+  }
+
+  .goal-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+  .goal-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 14px; color: var(--text);
+  }
+
+  .goal-list li .icon { font-size: 16px; flex-shrink: 0; }
+
+  /* SECTION */
+  .section {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .section-head {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--white);
+  }
+
+  .step-circle {
+    width: var(--step-size); height: var(--step-size);
+    background: var(--blue);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .section-head-text h2 { font-size: 17px; font-weight: 700; }
+  .section-head-text p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .section-body { padding: 20px 24px; }
+
+  p { margin-bottom: 12px; color: var(--text); }
+
+  /* EXPLAIN BOX */
+  .explain {
+    background: var(--orange-light);
+    border-left: 4px solid var(--orange);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+
+  .explain strong { color: var(--orange); }
+
+  /* CODE BLOCK */
+  .code-block {
+    background: var(--code-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 14px 0;
+  }
+
+  .code-top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .code-filename {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  .copy-btn {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: #94a3b8;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { background: rgba(255,255,255,0.15); color: white; }
+  .copy-btn.ok { color: #4ade80; }
+
+  pre {
+    padding: 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-x: auto;
+    color: #e2e8f0;
+  }
+
+  .cm { color: #64748b; }
+  .key { color: #7dd3fc; }
+  .str { color: #86efac; }
+  .num { color: #fbbf24; }
+  .cmd { color: #38bdf8; }
+
+  /* OUTPUT */
+  .output {
+    background: #0f172a;
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.9;
+    color: #94a3b8;
+    margin: 14px 0;
+  }
+
+  .output .ok { color: #4ade80; }
+  .output .hi { color: #38bdf8; }
+  .output .warn { color: #fbbf24; }
+  .output .label { color: #64748b; font-size: 11px; margin-bottom: 6px; display: block; }
+
+  /* CALLOUT */
+  .callout {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+
+  .callout .ico { font-size: 18px; flex-shrink: 0; }
+  .callout.info { background: var(--blue-light); border: 1px solid var(--blue-border); }
+  .callout.success { background: var(--green-light); border: 1px solid var(--green-border); }
+  .callout.tip { background: var(--purple-light); border: 1px solid var(--purple-border); }
+
+  /* TABLE */
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px; margin: 14px 0;
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  th {
+    background: var(--bg);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  code {
+    font-family: 'DM Mono', monospace;
+    font-size: 12.5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--blue);
+  }
+
+  /* DIAGRAM */
+  .flow {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 14px 0;
+    justify-content: center;
+  }
+
+  .fbox {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .fbox small { display: block; font-size: 10px; font-weight: 400; opacity: 0.7; margin-bottom: 2px; }
+  .fbox.init { background: #ede9fe; border: 2px solid #a78bfa; color: #5b21b6; }
+  .fbox.main { background: #dbeafe; border: 2px solid #60a5fa; color: #1d4ed8; }
+  .farrow { color: var(--muted); font-size: 20px; }
+
+  /* CHECKLIST */
+  .checklist { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+  .checklist li {
+    display: flex; gap: 10px; align-items: flex-start;
+    font-size: 14px; padding: 8px 12px;
+    background: var(--bg); border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .checklist li .num-badge {
+    background: var(--blue);
+    color: white;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    margin-top: 48px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  🎓 Classroom Lab &nbsp;·&nbsp; <strong>Kubernetes Init Containers</strong>
+</div>
+
+<div class="page">
+
+  <div class="header">
+    <h1>Init Containers <span>Lab</span></h1>
+    <p>Simple, step-by-step exercises — just copy, paste, and observe</p>
+    <div class="pill-row">
+      <div class="pill">⏱ 30 minutes</div>
+      <div class="pill">🟢 Hands-On</div>
+      <div class="pill">📦 3 exercises</div>
+      <div class="pill">⚙️ kubectl needed</div>
+    </div>
+  </div>
+
+  <!-- GOAL -->
+  <div class="goal-box">
+    <h3>🎯 What you will learn</h3>
+    <ul class="goal-list">
+      <li><span class="icon">1️⃣</span> What an init container is and when it runs</li>
+      <li><span class="icon">2️⃣</span> How to write a pod YAML with an init container</li>
+      <li><span class="icon">3️⃣</span> How to check init container status and logs</li>
+    </ul>
+  </div>
+
+  <!-- CONCEPT -->
+  <div class="section">
+    <div class="section-head">
+      <div class="step-circle">💡</div>
+      <div class="section-head-text">
+        <h2>Before You Start — What is an Init Container?</h2>
+        <p>Read this first — takes 2 minutes</p>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <p>An <strong>init container</strong> is a special container that runs <em>before</em> your main app starts. Think of it like a <strong>security guard</strong> at the door — the main app only enters after the guard says "all clear".</p>
+
+      <div class="flow">
+        <div class="fbox init"><small>Runs first</small>Init Container</div>
+        <div class="farrow">→</div>
+        <div class="fbox init"><small>Runs second</small>Init Container 2</div>
+        <div class="farrow">→</div>
+        <div class="fbox main"><small>Starts last</small>Main App ✅</div>
+      </div>
+
+      <div class="explain">
+        <strong>Simple rules to remember:</strong><br>
+        ✅ Init containers run <strong>one by one</strong> (not together)<br>
+        ✅ Each must <strong>finish successfully</strong> before the next starts<br>
+        ✅ Main app only starts <strong>after all inits finish</strong><br>
+        ❌ If init fails → pod <strong>restarts</strong> and tries again
+      </div>
+
+      <table>
+        <tr>
+          <th>Status you'll see</th>
+          <th>Meaning</th>
+        </tr>
+        <tr><td>Init:0/1</td><td>1 init container, still running (0 done)</td></tr>
+        <tr><td>Init:1/2</td><td>2 init containers, first one done</td></tr>
+        <tr><td>PodInitializing</td><td>All inits done, main container starting</td></tr>
+        <tr><td>Running</td><td>Main app is live ✅</td></tr>
+        <tr><td>Init:CrashLoopBackOff</td><td>Init container failed ❌</td></tr>
+      </table>
+
+    </div>
+  </div>
+
+  <!-- SETUP -->
+  <div class="section">
+    <div class="section-head">
+      <div class="step-circle">0</div>
+      <div class="section-head-text">
+        <h2>Setup — Create Namespace</h2>
+        <p>Do this once before any exercise</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl create namespace init-lab</span>
+<span class="cmd">kubectl config set-context --current --namespace=init-lab</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="label"># expected output</span>
+<span class="ok">namespace/init-lab created</span>
+<span class="ok">Context modified.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXERCISE 1 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="step-circle">1</div>
+      <div class="section-head-text">
+        <h2>Exercise 1 — Your First Init Container</h2>
+        <p>Init writes a message → main app reads it</p>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <p>In this exercise, the init container writes a text file. The main app reads that file. They share data using a <strong>volume</strong>.</p>
+
+      <div class="callout info">
+        <span class="ico">📁</span>
+        <div>A <strong>volume</strong> is like a shared folder between containers inside the same pod. Both the init container and main container can read/write to it.</div>
+      </div>
+
+      <p><strong>Step 1 — Create the YAML file</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">ex1-init.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">myfirst-init</span>
+  <span class="key">namespace</span>: <span class="str">init-lab</span>
+<span class="key">spec</span>:
+
+  <span class="cm"># ---- INIT CONTAINERS run FIRST ----</span>
+  <span class="key">initContainers</span>:
+  - <span class="key">name</span>: <span class="str">write-message</span>
+    <span class="key">image</span>: <span class="str">busybox:1.35</span>
+    <span class="key">command</span>: [<span class="str">"sh"</span>, <span class="str">"-c"</span>, <span class="str">"echo 'Hello from init!' > /shared/msg.txt && echo 'Init done!'"</span>]
+    <span class="key">volumeMounts</span>:
+    - <span class="key">name</span>: <span class="str">myvolume</span>
+      <span class="key">mountPath</span>: <span class="str">/shared</span>
+
+  <span class="cm"># ---- MAIN CONTAINER runs AFTER init ----</span>
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="str">read-message</span>
+    <span class="key">image</span>: <span class="str">busybox:1.35</span>
+    <span class="key">command</span>: [<span class="str">"sh"</span>, <span class="str">"-c"</span>, <span class="str">"echo 'Main started! Message is:' && cat /shared/msg.txt && sleep 3600"</span>]
+    <span class="key">volumeMounts</span>:
+    - <span class="key">name</span>: <span class="str">myvolume</span>
+      <span class="key">mountPath</span>: <span class="str">/shared</span>
+
+  <span class="cm"># ---- Shared volume ----</span>
+  <span class="key">volumes</span>:
+  - <span class="key">name</span>: <span class="str">myvolume</span>
+    <span class="key">emptyDir</span>: {}</pre>
+      </div>
+
+      <p><strong>Step 2 — Apply and watch</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cm"># Apply the pod</span>
+<span class="cmd">kubectl apply -f ex1-init.yaml</span>
+
+<span class="cm"># Watch status (you will see Init:0/1 → Running)</span>
+<span class="cmd">kubectl get pod myfirst-init -w</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="label"># what you should see</span>
+NAME            READY   STATUS       RESTARTS
+myfirst-init    0/1     <span class="warn">Init:0/1</span>     0
+myfirst-init    0/1     PodInitializing   0
+myfirst-init    1/1     <span class="ok">Running</span>      0
+      </div>
+
+      <p><strong>Step 3 — Read the logs</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cm"># See what the init container printed</span>
+<span class="cmd">kubectl logs myfirst-init -c write-message</span>
+
+<span class="cm"># See what the main container printed</span>
+<span class="cmd">kubectl logs myfirst-init -c read-message</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="label"># write-message logs</span>
+<span class="ok">Init done!</span>
+
+<span class="label"># read-message logs</span>
+Main started! Message is:
+<span class="hi">Hello from init!</span>
+      </div>
+
+      <div class="callout success">
+        <span class="ico">✅</span>
+        <div><strong>Exercise 1 done!</strong> You saw the init container write a file and the main app read it. The main app started only after init finished.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EXERCISE 2 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="step-circle">2</div>
+      <div class="section-head-text">
+        <h2>Exercise 2 — Wait for a Service</h2>
+        <p>Init keeps checking until a service is ready</p>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <p>Real apps often need to wait for a database or another service to be ready. The init container loops until it can connect, then exits and lets the main app start.</p>
+
+      <p><strong>Step 1 — Deploy a fake "database" service</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">fake-db.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">fake-db</span>
+  <span class="key">namespace</span>: <span class="str">init-lab</span>
+  <span class="key">labels</span>:
+    <span class="key">app</span>: <span class="str">fake-db</span>
+<span class="key">spec</span>:
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="str">db</span>
+    <span class="key">image</span>: <span class="str">nginx:alpine</span>   <span class="cm"># nginx acts as our fake service</span>
+    <span class="key">ports</span>:
+    - <span class="key">containerPort</span>: <span class="num">80</span>
+---
+<span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Service
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">db-service</span>
+  <span class="key">namespace</span>: <span class="str">init-lab</span>
+<span class="key">spec</span>:
+  <span class="key">selector</span>:
+    <span class="key">app</span>: <span class="str">fake-db</span>
+  <span class="key">ports</span>:
+  - <span class="key">port</span>: <span class="num">80</span></pre>
+      </div>
+
+      <p><strong>Step 2 — Deploy the app that waits for db-service</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">ex2-wait.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">myapp</span>
+  <span class="key">namespace</span>: <span class="str">init-lab</span>
+<span class="key">spec</span>:
+  <span class="key">initContainers</span>:
+  - <span class="key">name</span>: <span class="str">wait-for-db</span>
+    <span class="key">image</span>: <span class="str">busybox:1.35</span>
+    <span class="key">command</span>:
+    - <span class="str">sh</span>
+    - <span class="str">-c</span>
+    - |
+      echo <span class="str">"Checking if db-service is ready..."</span>
+      until nc -z db-service <span class="num">80</span>; do
+        echo <span class="str">"  db not ready yet, waiting 3 seconds..."</span>
+        sleep <span class="num">3</span>
+      done
+      echo <span class="str">"db-service is ready! Starting main app now."</span>
+
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="str">main-app</span>
+    <span class="key">image</span>: <span class="str">nginx:alpine</span></pre>
+      </div>
+
+      <p><strong>Step 3 — Apply in order and observe</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cm"># First deploy the app (it will WAIT for db)</span>
+<span class="cmd">kubectl apply -f ex2-wait.yaml</span>
+
+<span class="cm"># Watch it — stays stuck in Init:0/1</span>
+<span class="cmd">kubectl get pod myapp -w</span>
+
+<span class="cm"># Open a second terminal and check init logs</span>
+<span class="cmd">kubectl logs myapp -c wait-for-db -f</span>
+
+<span class="cm"># Now deploy the database (in another terminal)</span>
+<span class="cmd">kubectl apply -f fake-db.yaml</span>
+
+<span class="cm"># Watch myapp move from Init:0/1 → Running</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="label"># init logs while waiting</span>
+Checking if db-service is ready...
+  db not ready yet, waiting 3 seconds...
+  db not ready yet, waiting 3 seconds...
+<span class="ok">db-service is ready! Starting main app now.</span>
+
+        <span class="label"># pod status</span>
+NAME    READY   STATUS       RESTARTS
+myapp   0/1     <span class="warn">Init:0/1</span>     0       <span class="cm">&lt;-- waiting</span>
+myapp   1/1     <span class="ok">Running</span>      0       <span class="cm">&lt;-- db deployed, app starts</span>
+      </div>
+
+      <div class="callout success">
+        <span class="ico">✅</span>
+        <div><strong>Exercise 2 done!</strong> Your app waited for the database before starting — no manual coordination needed. This is a very common real-world pattern.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EXERCISE 3 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="step-circle">3</div>
+      <div class="section-head-text">
+        <h2>Exercise 3 — Debug a Failing Init Container</h2>
+        <p>Break it intentionally, then fix it</p>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <p>When an init container fails, your pod gets stuck. Let's practice <strong>how to debug it</strong>.</p>
+
+      <p><strong>Step 1 — Deploy a broken pod</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">ex3-broken.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">broken-pod</span>
+  <span class="key">namespace</span>: <span class="str">init-lab</span>
+<span class="key">spec</span>:
+  <span class="key">initContainers</span>:
+  - <span class="key">name</span>: <span class="str">bad-init</span>
+    <span class="key">image</span>: <span class="str">busybox:1.35</span>
+    <span class="key">command</span>: [<span class="str">"sh"</span>, <span class="str">"-c"</span>, <span class="str">"echo 'Starting...' && cat /no/such/file.txt"</span>]
+    <span class="cm"># ↑ This will FAIL because the file doesn't exist</span>
+
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="str">main-app</span>
+    <span class="key">image</span>: <span class="str">nginx:alpine</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl apply -f ex3-broken.yaml</span>
+<span class="cmd">kubectl get pod broken-pod -w</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="label"># pod will keep failing</span>
+NAME         READY   STATUS       RESTARTS
+broken-pod   0/1     <span class="warn">Init:Error</span>              0
+broken-pod   0/1     <span class="warn">Init:CrashLoopBackOff</span>   1
+      </div>
+
+      <p><strong>Step 2 — Use these 3 commands to debug</strong></p>
+
+      <ul class="checklist">
+        <li>
+          <span class="num-badge">1</span>
+          <div><strong>describe the pod</strong> — shows Events section at the bottom<br>
+          <code>kubectl describe pod broken-pod</code></div>
+        </li>
+        <li>
+          <span class="num-badge">2</span>
+          <div><strong>check init container logs</strong> — see the actual error message<br>
+          <code>kubectl logs broken-pod -c bad-init</code></div>
+        </li>
+        <li>
+          <span class="num-badge">3</span>
+          <div><strong>check previous run logs</strong> — if it already restarted<br>
+          <code>kubectl logs broken-pod -c bad-init --previous</code></div>
+        </li>
+      </ul>
+
+      <div class="output">
+        <span class="label"># kubectl logs broken-pod -c bad-init</span>
+Starting...
+cat: can't open '/no/such/file.txt': <span class="warn">No such file or directory</span>
+      </div>
+
+      <p><strong>Step 3 — Fix and redeploy</strong></p>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cm"># Delete the broken pod</span>
+<span class="cmd">kubectl delete pod broken-pod</span>
+
+<span class="cm"># Apply the fixed version below</span>
+<span class="cmd">kubectl apply -f ex3-fixed.yaml</span></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">ex3-fixed.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="str">fixed-pod</span>
+  <span class="key">namespace</span>: <span class="str">init-lab</span>
+<span class="key">spec</span>:
+  <span class="key">initContainers</span>:
+  - <span class="key">name</span>: <span class="str">good-init</span>
+    <span class="key">image</span>: <span class="str">busybox:1.35</span>
+    <span class="key">command</span>:
+    - <span class="str">sh</span>
+    - <span class="str">-c</span>
+    - |
+      echo <span class="str">"Starting..."</span>
+      <span class="cm"># Fixed: create the file first, then read it</span>
+      echo <span class="str">"hello"</span> > /tmp/myfile.txt
+      cat /tmp/myfile.txt
+      echo <span class="str">"Init done!"</span>
+
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="str">main-app</span>
+    <span class="key">image</span>: <span class="str">nginx:alpine</span></pre>
+      </div>
+
+      <div class="callout success">
+        <span class="ico">✅</span>
+        <div><strong>Exercise 3 done!</strong> You now know how to identify a failing init container and fix it using <code>describe</code> and <code>logs</code>.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CLEANUP -->
+  <div class="section">
+    <div class="section-head">
+      <div class="step-circle">🧹</div>
+      <div class="section-head-text">
+        <h2>Cleanup</h2>
+        <p>Delete everything after the lab</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="code-block">
+        <div class="code-top">
+          <span class="code-filename">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl delete namespace init-lab</span>
+<span class="cmd">kubectl config set-context --current --namespace=default</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK REF -->
+  <div class="section">
+    <div class="section-head">
+      <div class="step-circle">📋</div>
+      <div class="section-head-text">
+        <h2>Quick Reference Card</h2>
+        <p>Keep this handy during the lab</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <table>
+        <tr>
+          <th>Command</th>
+          <th>What it does</th>
+        </tr>
+        <tr><td>kubectl get pod &lt;name&gt; -w</td><td>Watch pod status live</td></tr>
+        <tr><td>kubectl describe pod &lt;name&gt;</td><td>Full details + events</td></tr>
+        <tr><td>kubectl logs &lt;pod&gt; -c &lt;init-name&gt;</td><td>Logs from init container</td></tr>
+        <tr><td>kubectl logs &lt;pod&gt; -c &lt;name&gt; --previous</td><td>Logs from last crashed run</td></tr>
+        <tr><td>kubectl delete pod &lt;name&gt;</td><td>Delete a pod</td></tr>
+        <tr><td>kubectl get pod</td><td>List all pods</td></tr>
+      </table>
+
+      <div class="callout tip">
+        <span class="ico">💡</span>
+        <div><strong>Tip:</strong> To get the init container name, run <code>kubectl describe pod &lt;name&gt;</code> and look under <strong>Init Containers</strong> section.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Kubernetes Init Containers · Classroom Lab · 3 exercises · ~30 min
+  </div>
+
+</div>
+
+<script>
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = '✓ Copied';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

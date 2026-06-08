@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes — Taints & Tolerations Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --white: #ffffff;
+    --border: #dde3ec;
+    --text: #1a202c;
+    --muted: #64748b;
+    --blue: #1d4ed8;
+    --blue-bg: #eff6ff;
+    --blue-bd: #bfdbfe;
+    --green: #15803d;
+    --green-bg: #f0fdf4;
+    --green-bd: #bbf7d0;
+    --orange: #c2410c;
+    --orange-bg: #fff7ed;
+    --orange-bd: #fed7aa;
+    --red: #b91c1c;
+    --red-bg: #fef2f2;
+    --red-bd: #fecaca;
+    --purple: #6d28d9;
+    --purple-bg: #f5f3ff;
+    --purple-bd: #ddd6fe;
+    --code: #0f172a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .banner {
+    background: var(--blue);
+    color: #fff;
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .banner-left { font-size: 14px; font-weight: 600; }
+  .banner-right { font-size: 12px; color: #bfdbfe; font-family: 'DM Mono', monospace; }
+
+  .page { max-width: 820px; margin: 0 auto; padding: 36px 24px 72px; }
+
+  .title-block { text-align: center; margin-bottom: 40px; }
+  .title-block h1 { font-size: 34px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .title-block h1 span { color: var(--blue); }
+  .title-block p { color: var(--muted); font-size: 14px; }
+  .chips { display: flex; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .chip { font-family: 'DM Mono', monospace; font-size: 12px; padding: 4px 14px; border-radius: 100px; border: 1px solid var(--border); background: var(--white); color: var(--muted); }
+
+  .card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+
+  .card-head { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+
+  .step-circle { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; font-family: 'DM Mono', monospace; }
+  .sc-blue   { background: var(--blue-bg);   color: var(--blue);   border: 2px solid var(--blue-bd); }
+  .sc-green  { background: var(--green-bg);  color: var(--green);  border: 2px solid var(--green-bd); }
+  .sc-orange { background: var(--orange-bg); color: var(--orange); border: 2px solid var(--orange-bd); }
+  .sc-red    { background: var(--red-bg);    color: var(--red);    border: 2px solid var(--red-bd); }
+  .sc-purple { background: var(--purple-bg); color: var(--purple); border: 2px solid var(--purple-bd); }
+  .sc-star   { background: #fefce8; color: #a16207; border: 2px solid #fde68a; }
+
+  .card-head-text h2 { font-size: 17px; font-weight: 700; }
+  .card-head-text p  { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .card-body { padding: 22px 24px; }
+
+  p { font-size: 14px; color: #374151; margin-bottom: 12px; }
+
+  /* DIAGRAM */
+  .diagram { display: grid; grid-template-columns: 1fr 48px 1fr; align-items: center; margin: 16px 0; gap: 0; }
+  .node-box { border-radius: 10px; padding: 20px; text-align: center; }
+  .node-prod { background: var(--green-bg); border: 2px solid var(--green-bd); }
+  .node-test { background: var(--orange-bg); border: 2px solid var(--orange-bd); }
+  .node-box .node-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .node-box .node-tag { display: inline-block; font-family: 'DM Mono', monospace; font-size: 11px; padding: 3px 10px; border-radius: 100px; margin-bottom: 5px; }
+  .nt-prod { background: #bbf7d0; color: var(--green); }
+  .nt-test { background: #fed7aa; color: var(--orange); }
+  .node-box .node-sub { font-size: 12px; color: var(--muted); }
+  .diagram-vs { text-align: center; font-size: 22px; color: var(--muted); }
+
+  /* CONCEPT ROW */
+  .concept-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media(max-width:580px){ .concept-row { grid-template-columns: 1fr; } }
+  .concept-box { border-radius: 8px; padding: 16px; border: 1px solid; }
+  .cb-red    { background: var(--red-bg);    border-color: var(--red-bd); }
+  .cb-green  { background: var(--green-bg);  border-color: var(--green-bd); }
+  .concept-box .cb-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .concept-box .cb-body  { font-size: 13px; color: #374151; }
+
+  /* CODE */
+  .code-wrap { background: var(--code); border-radius: 8px; overflow: hidden; margin: 14px 0; }
+  .code-bar { display: flex; justify-content: space-between; align-items: center; padding: 9px 16px; background: #1e293b; border-bottom: 1px solid #334155; }
+  .code-fname { font-family: 'DM Mono', monospace; font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px; }
+  .code-fname::before { content: '▸'; color: #22c55e; }
+  .copy-btn { font-family: 'DM Mono', monospace; font-size: 11px; background: #334155; border: none; color: #94a3b8; padding: 3px 12px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+  .copy-btn:hover { background: #475569; color: #f1f5f9; }
+  .copy-btn.ok { color: #22c55e; }
+
+  pre { padding: 18px; font-family: 'DM Mono', monospace; font-size: 12.5px; line-height: 1.85; overflow-x: auto; color: #cbd5e1; }
+  pre .cm  { color: #475569; }
+  pre .key { color: #7dd3fc; }
+  pre .val { color: #86efac; }
+  pre .cmd { color: #93c5fd; }
+  pre .ok  { color: #22c55e; }
+  pre .hl  { color: #fbbf24; }
+  pre .err { color: #f87171; }
+
+  .callout { display: flex; gap: 12px; padding: 14px 16px; border-radius: 8px; margin: 14px 0; font-size: 13.5px; border: 1px solid; line-height: 1.6; }
+  .callout .ico { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+  .callout.info   { background: var(--blue-bg);   border-color: var(--blue-bd);   color: #1e40af; }
+  .callout.ok     { background: var(--green-bg);  border-color: var(--green-bd);  color: #166534; }
+  .callout.warn   { background: var(--orange-bg); border-color: var(--orange-bd); color: #9a3412; }
+  .callout.danger { background: var(--red-bg);    border-color: var(--red-bd);    color: #991b1b; }
+
+  .output { background: #020617; border-radius: 8px; padding: 16px 18px; font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.9; color: #64748b; margin: 10px 0; }
+  .output .ok  { color: #22c55e; }
+  .output .hi  { color: #60a5fa; }
+  .output .hl  { color: #fbbf24; }
+  .output .err { color: #f87171; }
+  .output .dim { display: block; color: #334155; font-size: 11px; margin-bottom: 3px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  th { background: #f1f5f9; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--border); font-family: 'DM Mono', monospace; }
+  td { padding: 9px 14px; border-bottom: 1px solid #f1f5f9; font-family: 'DM Mono', monospace; font-size: 12.5px; color: #374151; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  code { font-family: 'DM Mono', monospace; font-size: 12.5px; background: #f1f5f9; border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; color: var(--blue); }
+
+  .footer { text-align: center; margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .footer strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div class="banner-left">⎈ Kubernetes Lab &nbsp;·&nbsp; Taints &amp; Tolerations</div>
+  <div class="banner-right">© Akshat Gupta · All Rights Reserved</div>
+</div>
+
+<div class="page">
+
+  <!-- TITLE -->
+  <div class="title-block">
+    <h1>Taints &amp; Tolerations <span>Lab</span></h1>
+    <p>Keep prod pods on prod-node · Keep test pods on test-node</p>
+    <div class="chips">
+      <div class="chip">⏱ 20 minutes</div>
+      <div class="chip">🟢 Beginner</div>
+      <div class="chip">2 nodes needed</div>
+      <div class="chip">kubectl</div>
+    </div>
+  </div>
+
+  <!-- WHAT WE ARE DOING -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">💡</div>
+      <div class="card-head-text">
+        <h2>What We Are Doing</h2>
+        <p>Understand the goal before touching anything</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <p>Your cluster has two nodes — one for production, one for testing. We want a hard rule: <strong>prod pods only on prod-node, test pods only on test-node</strong>.</p>
+      <p>We do this using <strong>Taints</strong> on the nodes and <strong>Tolerations</strong> on the pods.</p>
+
+      <div class="diagram">
+        <div class="node-box node-prod">
+          <div class="node-title" style="color:#15803d">prod-node</div>
+          <div class="node-tag nt-prod">Taint: env=prod:NoSchedule</div>
+          <div class="node-sub" style="margin-top:6px">🟢 Only prod pods allowed</div>
+        </div>
+        <div class="diagram-vs">↔</div>
+        <div class="node-box node-test">
+          <div class="node-title" style="color:#c2410c">test-node</div>
+          <div class="node-tag nt-test">Taint: env=test:NoSchedule</div>
+          <div class="node-sub" style="margin-top:6px">🟠 Only test pods allowed</div>
+        </div>
+      </div>
+
+      <!-- CONCEPT -->
+      <div class="concept-row">
+        <div class="concept-box cb-red">
+          <div class="cb-title" style="color:#b91c1c">🚫 Taint (on the Node)</div>
+          <div class="cb-body">A taint is like a <strong>"No Entry"</strong> sign on a node. It repels all pods that don't have the matching permission (toleration).</div>
+        </div>
+        <div class="concept-box cb-green">
+          <div class="cb-title" style="color:#15803d">✅ Toleration (on the Pod)</div>
+          <div class="cb-body">A toleration is the pod's <strong>"permission pass"</strong>. A pod with the right toleration is allowed past the taint and can land on that node.</div>
+        </div>
+      </div>
+
+      <div class="callout info">
+        <span class="ico">ℹ️</span>
+        <div><strong>Simple rule:</strong> A pod can only land on a tainted node if the pod's toleration matches the node's taint. No toleration = pod stays away.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1 — GET NODES -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">1</div>
+      <div class="card-head-text">
+        <h2>Get Your Node Names</h2>
+        <p>Find the actual names of your two nodes</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Run this first. Note down the exact names of your two nodes — you will use them in every command below.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="cmd">kubectl get nodes</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># example — your names will be different</span>
+NAME          STATUS   ROLES    AGE
+<span class="ok">prod-node</span>     Ready    worker   2d
+<span class="hl">test-node</span>     Ready    worker   2d
+      </div>
+
+      <div class="callout info">
+        <span class="ico">📝</span>
+        <div>Replace <code>prod-node</code> and <code>test-node</code> with your actual node names in every command that follows.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 — TAINT NODES -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">2</div>
+      <div class="card-head-text">
+        <h2>Taint Both Nodes</h2>
+        <p>Put a "No Entry" sign on each node</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <p>A taint has three parts: <code>key=value:effect</code></p>
+      <p>We use <code>NoSchedule</code> as the effect — this means <strong>no pod can land on this node unless it has the matching toleration</strong>.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="cm"># Taint the production node</span>
+<span class="cmd">kubectl taint node prod-node env=prod:NoSchedule</span>
+
+<span class="cm"># Taint the test node</span>
+<span class="cmd">kubectl taint node test-node env=test:NoSchedule</span>
+
+<span class="cm"># Verify — check taints are applied</span>
+<span class="cmd">kubectl describe node prod-node | grep Taint</span>
+<span class="cmd">kubectl describe node test-node | grep Taint</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># expected output</span>
+Taints: <span class="ok">env=prod:NoSchedule</span>
+Taints: <span class="hl">env=test:NoSchedule</span>
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">✅</span>
+        <div>Both nodes are now tainted. From this point on, <strong>no pod can land on either node</strong> unless it has the correct toleration.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 — PROD POD -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-green">3</div>
+      <div class="card-head-text">
+        <h2>Deploy the Production Pod</h2>
+        <p>This pod tolerates the prod-node taint — lands on prod-node</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <p>This pod has a <strong>toleration</strong> that matches the taint on <code>prod-node</code>. That is its permission to land there. It also has a <strong>nodeSelector</strong> so it only targets prod-node and not any other node.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">prod-pod.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="val">prod-pod</span>
+  <span class="key">labels</span>:
+    <span class="key">env</span>: <span class="val">prod</span>
+<span class="key">spec</span>:
+
+  <span class="cm"># This toleration = permission to land on prod-node</span>
+  <span class="key">tolerations</span>:
+  - <span class="key">key</span>: <span class="val">"env"</span>
+    <span class="key">operator</span>: <span class="val">"Equal"</span>
+    <span class="key">value</span>: <span class="val">"prod"</span>
+    <span class="key">effect</span>: <span class="val">"NoSchedule"</span>
+
+  <span class="cm"># This ensures the pod targets prod-node specifically</span>
+  <span class="key">nodeSelector</span>:
+    <span class="key">kubernetes.io/hostname</span>: <span class="val">prod-node</span>
+
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="val">prod-app</span>
+    <span class="key">image</span>: <span class="val">nginx:alpine</span></pre>
+      </div>
+
+      <div class="callout info">
+        <span class="ico">ℹ️</span>
+        <div>Replace <code>prod-node</code> in the <code>nodeSelector</code> with your actual prod node name.</div>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="cmd">kubectl apply -f prod-pod.yaml</span>
+
+<span class="cm"># Check which node it landed on</span>
+<span class="cmd">kubectl get pod prod-pod -o wide</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># expected output</span>
+NAME       READY   STATUS    NODE
+prod-pod   1/1     <span class="ok">Running</span>   <span class="ok">prod-node</span>   ✅
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">✅</span>
+        <div>The <strong>NODE column shows prod-node</strong>. The toleration gave the pod permission, and nodeSelector pointed it to the right place.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 — TEST POD -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-orange">4</div>
+      <div class="card-head-text">
+        <h2>Deploy the Test Pod</h2>
+        <p>This pod tolerates the test-node taint — lands on test-node</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <p>Same idea — but this pod's toleration matches the taint on <code>test-node</code>.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">test-pod.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="val">test-pod</span>
+  <span class="key">labels</span>:
+    <span class="key">env</span>: <span class="val">test</span>
+<span class="key">spec</span>:
+
+  <span class="cm"># This toleration = permission to land on test-node</span>
+  <span class="key">tolerations</span>:
+  - <span class="key">key</span>: <span class="val">"env"</span>
+    <span class="key">operator</span>: <span class="val">"Equal"</span>
+    <span class="key">value</span>: <span class="val">"test"</span>
+    <span class="key">effect</span>: <span class="val">"NoSchedule"</span>
+
+  <span class="cm"># This ensures the pod targets test-node specifically</span>
+  <span class="key">nodeSelector</span>:
+    <span class="key">kubernetes.io/hostname</span>: <span class="val">test-node</span>
+
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="val">test-app</span>
+    <span class="key">image</span>: <span class="val">nginx:alpine</span></pre>
+      </div>
+
+      <div class="callout info">
+        <span class="ico">ℹ️</span>
+        <div>Replace <code>test-node</code> in the <code>nodeSelector</code> with your actual test node name.</div>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="cmd">kubectl apply -f test-pod.yaml</span>
+
+<span class="cm"># Check which node it landed on</span>
+<span class="cmd">kubectl get pod test-pod -o wide</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># expected output</span>
+NAME       READY   STATUS    NODE
+test-pod   1/1     <span class="ok">Running</span>   <span class="hl">test-node</span>   ✅
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">✅</span>
+        <div>The <strong>NODE column shows test-node</strong>. Both pods are now exactly where they should be.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 — VIEW BOTH -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">5</div>
+      <div class="card-head-text">
+        <h2>View Both Pods Together</h2>
+        <p>Confirm each pod is on the correct node</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="cmd">kubectl get pods -o wide</span></pre>
+      </div>
+
+      <div class="output">
+NAME       READY   STATUS    NODE
+prod-pod   1/1     <span class="ok">Running</span>   <span class="ok">prod-node</span>
+test-pod   1/1     <span class="ok">Running</span>   <span class="hl">test-node</span>
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">🎉</span>
+        <div><strong>prod-pod is on prod-node. test-pod is on test-node.</strong> The taint and toleration boundary is working perfectly.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6 — PROOF IT WORKS -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-red">6</div>
+      <div class="card-head-text">
+        <h2>Bonus — Prove the Boundary Works</h2>
+        <p>A pod with no toleration gets stuck — cannot land anywhere</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <p>Deploy a pod with <strong>no toleration at all</strong>. Since both nodes are tainted, no node will accept it. It will stay <code>Pending</code> forever.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">plain-pod.yaml</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="val">plain-pod</span>
+<span class="key">spec</span>:
+  <span class="cm"># No tolerations — will be blocked by both taints</span>
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="val">app</span>
+    <span class="key">image</span>: <span class="val">nginx:alpine</span></pre>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="cmd">kubectl apply -f plain-pod.yaml</span>
+<span class="cmd">kubectl get pod plain-pod -o wide</span>
+
+<span class="cm"># See WHY it is stuck</span>
+<span class="cmd">kubectl describe pod plain-pod | grep -A5 Events</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># pod is stuck — no node will accept it</span>
+NAME        READY   STATUS    NODE
+plain-pod   0/1     <span class="err">Pending</span>   &lt;none&gt;
+
+        <span class="dim"># describe Events shows the reason</span>
+<span class="err">0/2 nodes are available:</span>
+<span class="err">  1 node had untolerated taint {env: prod}</span>
+<span class="err">  1 node had untolerated taint {env: test}</span>
+      </div>
+
+      <div class="callout warn">
+        <span class="ico">⚠️</span>
+        <div><strong>This proves the boundary is real.</strong> No pod without the correct toleration can sneak onto either node. This is exactly how production teams protect dedicated node pools.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REFERENCE -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-star">★</div>
+      <div class="card-head-text">
+        <h2>Quick Reference</h2>
+        <p>Commands and cleanup</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <table>
+        <tr><th>Command</th><th>What it does</th></tr>
+        <tr><td>kubectl get nodes</td><td>List all nodes</td></tr>
+        <tr><td>kubectl taint node &lt;name&gt; key=val:NoSchedule</td><td>Add a taint to a node</td></tr>
+        <tr><td>kubectl describe node &lt;name&gt; | grep Taint</td><td>Check taints on a node</td></tr>
+        <tr><td>kubectl get pods -o wide</td><td>Show pods with their node</td></tr>
+        <tr><td>kubectl describe pod &lt;name&gt;</td><td>See events and scheduling info</td></tr>
+        <tr><td>kubectl taint node &lt;name&gt; key=val:NoSchedule-</td><td>Remove a taint (trailing - removes it)</td></tr>
+      </table>
+
+      <p style="margin-top:20px"><strong>Cleanup — run after the lab:</strong></p>
+
+      <div class="code-wrap">
+        <div class="code-bar"><span class="code-fname">terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+        <pre><span class="cm"># Delete all pods</span>
+<span class="cmd">kubectl delete pod prod-pod test-pod plain-pod</span>
+
+<span class="cm"># Remove taints from both nodes (trailing - removes the taint)</span>
+<span class="cmd">kubectl taint node prod-node env=prod:NoSchedule-</span>
+<span class="cmd">kubectl taint node test-node env=test:NoSchedule-</span>
+
+<span class="cm"># Verify nodes are clean</span>
+<span class="cmd">kubectl describe node prod-node | grep Taint</span>
+<span class="cmd">kubectl describe node test-node | grep Taint</span></pre>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <p><strong>Authored by Akshat Gupta</strong></p>
+    <p>© All Rights Reserved &nbsp;·&nbsp; Kubernetes Training Programme &nbsp;·&nbsp; Taints &amp; Tolerations Lab</p>
+  </div>
+
+</div>
+
+<script>
+function copyCode(btn) {
+  const pre = btn.closest('.code-wrap').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = '✓ Copied';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

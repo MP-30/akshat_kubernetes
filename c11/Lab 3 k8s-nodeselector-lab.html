@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes — Node Selector Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --white: #ffffff;
+    --border: #dde3ec;
+    --text: #1a202c;
+    --muted: #64748b;
+    --blue: #1d4ed8;
+    --blue-bg: #eff6ff;
+    --blue-bd: #bfdbfe;
+    --green: #15803d;
+    --green-bg: #f0fdf4;
+    --green-bd: #bbf7d0;
+    --orange: #c2410c;
+    --orange-bg: #fff7ed;
+    --orange-bd: #fed7aa;
+    --purple: #6d28d9;
+    --purple-bg: #f5f3ff;
+    --purple-bd: #ddd6fe;
+    --code: #0f172a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* TOP BANNER */
+  .banner {
+    background: var(--blue);
+    color: #fff;
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .banner-left { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .banner-right { font-size: 12px; color: #bfdbfe; font-family: 'DM Mono', monospace; }
+
+  /* PAGE */
+  .page { max-width: 820px; margin: 0 auto; padding: 36px 24px 72px; }
+
+  /* TITLE */
+  .title-block { text-align: center; margin-bottom: 40px; }
+  .title-block h1 { font-size: 34px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .title-block h1 span { color: var(--blue); }
+  .title-block p { color: var(--muted); font-size: 14px; }
+  .chips { display: flex; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .chip {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 4px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--white);
+    color: var(--muted);
+  }
+
+  /* SECTION CARD */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .step-circle {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px;
+    flex-shrink: 0;
+    font-family: 'DM Mono', monospace;
+  }
+  .sc-blue   { background: var(--blue-bg);   color: var(--blue);   border: 2px solid var(--blue-bd); }
+  .sc-green  { background: var(--green-bg);  color: var(--green);  border: 2px solid var(--green-bd); }
+  .sc-orange { background: var(--orange-bg); color: var(--orange); border: 2px solid var(--orange-bd); }
+  .sc-purple { background: var(--purple-bg); color: var(--purple); border: 2px solid var(--purple-bd); }
+  .sc-star   { background: #fefce8; color: #a16207; border: 2px solid #fde68a; }
+
+  .card-head-text h2 { font-size: 17px; font-weight: 700; }
+  .card-head-text p  { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .card-body { padding: 22px 24px; }
+
+  p { font-size: 14px; color: #374151; margin-bottom: 12px; }
+
+  /* DIAGRAM */
+  .diagram {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    align-items: center;
+    gap: 0;
+    margin: 16px 0;
+  }
+
+  .node-box {
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+  .node-prod { background: var(--green-bg); border: 2px solid var(--green-bd); }
+  .node-test { background: var(--orange-bg); border: 2px solid var(--orange-bd); }
+
+  .node-box .node-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .node-box .node-label {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 3px 12px;
+    border-radius: 100px;
+    margin-bottom: 8px;
+  }
+  .nl-prod { background: #bbf7d0; color: var(--green); }
+  .nl-test { background: #fed7aa; color: var(--orange); }
+
+  .node-box .node-pods { font-size: 13px; color: var(--muted); }
+
+  .diagram-vs { text-align: center; font-size: 22px; color: var(--muted); }
+
+  /* CODE BLOCK */
+  .code-wrap {
+    background: var(--code);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 14px 0;
+  }
+
+  .code-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 16px;
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
+  }
+
+  .code-fname {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #94a3b8;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .code-fname::before { content: '▸'; color: #22c55e; }
+
+  .copy-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    background: #334155;
+    border: none;
+    color: #94a3b8;
+    padding: 3px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: #475569; color: #f1f5f9; }
+  .copy-btn.ok { color: #22c55e; }
+
+  pre {
+    padding: 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.85;
+    overflow-x: auto;
+    color: #cbd5e1;
+  }
+
+  pre .cm  { color: #475569; }
+  pre .key { color: #7dd3fc; }
+  pre .val { color: #86efac; }
+  pre .cmd { color: #93c5fd; }
+  pre .ok  { color: #22c55e; }
+  pre .hl  { color: #fbbf24; }
+  pre .err { color: #f87171; }
+
+  /* CALLOUT */
+  .callout {
+    display: flex; gap: 12px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin: 14px 0;
+    font-size: 13.5px;
+    border: 1px solid;
+    line-height: 1.6;
+  }
+  .callout .ico { font-size: 17px; flex-shrink: 0; margin-top: 1px; }
+  .callout.info   { background: var(--blue-bg);   border-color: var(--blue-bd);   color: #1e40af; }
+  .callout.ok     { background: var(--green-bg);  border-color: var(--green-bd);  color: #166534; }
+  .callout.warn   { background: var(--orange-bg); border-color: var(--orange-bd); color: #9a3412; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+  th { background: #f1f5f9; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--border); font-family: 'DM Mono', monospace; }
+  td { padding: 9px 14px; border-bottom: 1px solid #f1f5f9; font-family: 'DM Mono', monospace; font-size: 12.5px; color: #374151; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+
+  code { font-family: 'DM Mono', monospace; font-size: 12.5px; background: #f1f5f9; border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; color: var(--blue); }
+
+  /* OUTPUT BOX */
+  .output {
+    background: #020617;
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 1.9;
+    color: #64748b;
+    margin: 10px 0;
+  }
+  .output .ok  { color: #22c55e; }
+  .output .hi  { color: #60a5fa; }
+  .output .hl  { color: #fbbf24; }
+  .output .dim { display: block; color: #334155; font-size: 11px; margin-bottom: 3px; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .footer strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <div class="banner-left">⎈ Kubernetes Lab &nbsp;·&nbsp; Node Selector</div>
+  <div class="banner-right">© Akshat Gupta · All Rights Reserved</div>
+</div>
+
+<div class="page">
+
+  <!-- TITLE -->
+  <div class="title-block">
+    <h1>Node Selector <span>Lab</span></h1>
+    <p>Schedule prod pods on prod-node · Schedule test pods on test-node</p>
+    <div class="chips">
+      <div class="chip">⏱ 20 minutes</div>
+      <div class="chip">🟢 Beginner</div>
+      <div class="chip">2 nodes needed</div>
+      <div class="chip">kubectl</div>
+    </div>
+  </div>
+
+  <!-- SCENARIO -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">💡</div>
+      <div class="card-head-text">
+        <h2>What We Are Doing</h2>
+        <p>Understand the goal before touching anything</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Your cluster has two nodes. You want to make sure the right pods always land on the right node — production pods on the production node, test pods on the test node. We will do this using <strong>Node Selector</strong> — a simple label-based rule inside the pod YAML.</p>
+
+      <div class="diagram">
+        <div class="node-box node-prod">
+          <div class="node-title" style="color:#15803d">prod-node</div>
+          <div class="node-label nl-prod">env=prod</div>
+          <div class="node-pods">🟢 prod pods run here</div>
+        </div>
+        <div class="diagram-vs">↔</div>
+        <div class="node-box node-test">
+          <div class="node-title" style="color:#c2410c">test-node</div>
+          <div class="node-label nl-test">env=test</div>
+          <div class="node-pods">🟠 test pods run here</div>
+        </div>
+      </div>
+
+      <div class="callout info">
+        <span class="ico">ℹ️</span>
+        <div><strong>Node Selector</strong> works by attaching a label to a node, then telling the pod "only schedule me on a node that has this label." It is the simplest scheduling rule in Kubernetes.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1 - GET NODES -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">1</div>
+      <div class="card-head-text">
+        <h2>Get Your Node Names</h2>
+        <p>Find the actual names of your two nodes</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Run this command to see your nodes. Note down the names — you will use them in the next step.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl get nodes</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># example output — your names will be different</span>
+NAME            STATUS   ROLES    AGE
+<span class="ok">prod-node</span>       Ready    worker   2d
+<span class="ok">test-node</span>       Ready    worker   2d
+      </div>
+
+      <div class="callout info">
+        <span class="ico">📝</span>
+        <div>In this lab we call the nodes <code>prod-node</code> and <code>test-node</code>. Replace these with your actual node names in every command.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 - LABEL NODES -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">2</div>
+      <div class="card-head-text">
+        <h2>Label the Nodes</h2>
+        <p>Attach env=prod and env=test labels to each node</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>A label is just a key=value tag. We label each node so pods can target it using <code>nodeSelector</code>.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cm"># Label the production node</span>
+<span class="cmd">kubectl label node prod-node env=prod</span>
+
+<span class="cm"># Label the test node</span>
+<span class="cmd">kubectl label node test-node env=test</span>
+
+<span class="cm"># Verify the labels were applied</span>
+<span class="cmd">kubectl get nodes --show-labels | grep env</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># expected output</span>
+prod-node   Ready   ...   env=<span class="ok">prod</span>,...
+test-node   Ready   ...   env=<span class="hl">test</span>,...
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">✅</span>
+        <div>Both nodes are now labelled. The nodes themselves are not changed in any way — we just added a tag. Pods can now use <code>nodeSelector</code> to pick which node they land on.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 - PROD POD -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-green">3</div>
+      <div class="card-head-text">
+        <h2>Deploy the Production Pod</h2>
+        <p>This pod will only run on prod-node</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Create a file called <code>prod-pod.yaml</code> with the content below. Notice the <code>nodeSelector</code> line — it tells Kubernetes to only schedule this pod on a node where <code>env=prod</code>.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">prod-pod.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="val">prod-pod</span>
+  <span class="key">labels</span>:
+    <span class="key">env</span>: <span class="val">prod</span>
+<span class="key">spec</span>:
+
+  <span class="cm"># Only schedule on nodes with label env=prod</span>
+  <span class="key">nodeSelector</span>:
+    <span class="key">env</span>: <span class="val">prod</span>
+
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="val">prod-app</span>
+    <span class="key">image</span>: <span class="val">nginx:alpine</span>
+    <span class="key">ports</span>:
+    - <span class="key">containerPort</span>: 80</pre>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl apply -f prod-pod.yaml</span>
+
+<span class="cm"># Check which node it landed on (-o wide shows the NODE column)</span>
+<span class="cmd">kubectl get pod prod-pod -o wide</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># expected output</span>
+NAME       READY   STATUS    NODE
+prod-pod   1/1     <span class="ok">Running</span>   <span class="ok">prod-node</span>   ← landed on the right node ✅
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">✅</span>
+        <div>The <strong>NODE column shows prod-node</strong>. The nodeSelector worked — Kubernetes picked prod-node because it has the <code>env=prod</code> label.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 - TEST POD -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-orange">4</div>
+      <div class="card-head-text">
+        <h2>Deploy the Test Pod</h2>
+        <p>This pod will only run on test-node</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Same idea — but this time <code>nodeSelector</code> targets <code>env=test</code>.</p>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">test-pod.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="val">test-pod</span>
+  <span class="key">labels</span>:
+    <span class="key">env</span>: <span class="val">test</span>
+<span class="key">spec</span>:
+
+  <span class="cm"># Only schedule on nodes with label env=test</span>
+  <span class="key">nodeSelector</span>:
+    <span class="key">env</span>: <span class="val">test</span>
+
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="val">test-app</span>
+    <span class="key">image</span>: <span class="val">nginx:alpine</span>
+    <span class="key">ports</span>:
+    - <span class="key">containerPort</span>: 80</pre>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl apply -f test-pod.yaml</span>
+
+<span class="cm"># Check which node it landed on</span>
+<span class="cmd">kubectl get pod test-pod -o wide</span></pre>
+      </div>
+
+      <div class="output">
+        <span class="dim"># expected output</span>
+NAME       READY   STATUS    NODE
+test-pod   1/1     <span class="ok">Running</span>   <span class="hl">test-node</span>   ← landed on the right node ✅
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">✅</span>
+        <div>The <strong>NODE column shows test-node</strong>. Both pods are now on their correct nodes.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 - VIEW BOTH -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-blue">5</div>
+      <div class="card-head-text">
+        <h2>View Both Pods Together</h2>
+        <p>Confirm each pod is on the correct node</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl get pods -o wide</span></pre>
+      </div>
+
+      <div class="output">
+NAME       READY   STATUS    NODE
+prod-pod   1/1     <span class="ok">Running</span>   <span class="ok">prod-node</span>
+test-pod   1/1     <span class="ok">Running</span>   <span class="hl">test-node</span>
+      </div>
+
+      <div class="callout ok">
+        <span class="ico">🎉</span>
+        <div><strong>Perfect!</strong> prod-pod is on prod-node. test-pod is on test-node. Node Selector is working exactly as expected.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6 - WHAT HAPPENS WITHOUT SELECTOR -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-purple">6</div>
+      <div class="card-head-text">
+        <h2>Bonus — What if No nodeSelector?</h2>
+        <p>A pod with no selector can land on any node</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>If a pod has no <code>nodeSelector</code>, Kubernetes picks any available node. Try it:</p>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">no-selector-pod.yaml</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="key">apiVersion</span>: v1
+<span class="key">kind</span>: Pod
+<span class="key">metadata</span>:
+  <span class="key">name</span>: <span class="val">random-pod</span>
+<span class="key">spec</span>:
+  <span class="cm"># No nodeSelector — Kubernetes picks any node</span>
+  <span class="key">containers</span>:
+  - <span class="key">name</span>: <span class="val">app</span>
+    <span class="key">image</span>: <span class="val">nginx:alpine</span></pre>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <span class="code-fname">terminal</span>
+          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+        <pre><span class="cmd">kubectl apply -f no-selector-pod.yaml</span>
+<span class="cmd">kubectl get pod random-pod -o wide</span>
+
+<span class="cm"># It can land on EITHER node — no preference set</span></pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="ico">⚠️</span>
+        <div>Without <code>nodeSelector</code>, the scheduler picks any node. This is why we use nodeSelector — to make placement predictable and intentional.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REFERENCE TABLE -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-circle sc-star">★</div>
+      <div class="card-head-text">
+        <h2>Quick Reference</h2>
+        <p>All commands used in this lab</p>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <table>
+        <tr><th>Command</th><th>What it does</th></tr>
+        <tr><td>kubectl get nodes</td><td>List all nodes in the cluster</td></tr>
+        <tr><td>kubectl label node &lt;name&gt; env=prod</td><td>Add label env=prod to a node</td></tr>
+        <tr><td>kubectl get nodes --show-labels</td><td>Show nodes with all their labels</td></tr>
+        <tr><td>kubectl apply -f &lt;file.yaml&gt;</td><td>Create the pod from the YAML file</td></tr>
+        <tr><td>kubectl get pods -o wide</td><td>Show pods with the NODE column</td></tr>
+        <tr><td>kubectl describe pod &lt;name&gt;</td><td>See full details including nodeSelector</td></tr>
+        <tr><td>kubectl label node &lt;name&gt; env-</td><td>Remove the env label from a node</td></tr>
+      </table>
+
+      <!-- CLEANUP -->
+      <div style="margin-top:20px">
+        <p><strong>Cleanup — run after the lab:</strong></p>
+        <div class="code-wrap">
+          <div class="code-bar">
+            <span class="code-fname">terminal</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><span class="cm"># Delete all pods</span>
+<span class="cmd">kubectl delete pod prod-pod test-pod random-pod</span>
+
+<span class="cm"># Remove labels from nodes</span>
+<span class="cmd">kubectl label node prod-node env-</span>
+<span class="cmd">kubectl label node test-node env-</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <p><strong>Authored by Akshat Gupta</strong></p>
+    <p>© All Rights Reserved &nbsp;·&nbsp; Kubernetes Training Programme &nbsp;·&nbsp; Node Selector Lab</p>
+  </div>
+
+</div>
+
+<script>
+function copyCode(btn) {
+  const pre = btn.closest('.code-wrap').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = '✓ Copied';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

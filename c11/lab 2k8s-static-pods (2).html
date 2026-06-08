@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes Static Pods — Deep Dive</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #f97316;
+    --accent3: #a78bfa;
+    --green: #22d3a4;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --code-bg: #0d1117;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lora', Georgia, serif;
+    font-size: 16px;
+    line-height: 1.8;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding: 80px 0 60px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% -10%, rgba(0,212,255,.18) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 85% 80%, rgba(167,139,250,.12) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.4rem, 5vw, 4rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    max-width: 620px;
+    margin: 0 auto;
+    color: #94a3b8;
+    font-size: 1.05rem;
+  }
+  .badge-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .7rem;
+    padding: 4px 14px;
+    border-radius: 99px;
+    border: 1px solid;
+  }
+  .badge-blue  { border-color: var(--accent);  color: var(--accent);  background: rgba(0,212,255,.07); }
+  .badge-orange{ border-color: var(--accent2); color: var(--accent2); background: rgba(249,115,22,.07);}
+  .badge-purple{ border-color: var(--accent3); color: var(--accent3); background: rgba(167,139,250,.07);}
+
+  /* ── LAYOUT ── */
+  .container { max-width: 900px; margin: 0 auto; padding: 0 28px; }
+
+  /* ── TOC ── */
+  .toc {
+    margin: 48px auto;
+    max-width: 900px;
+    padding: 0 28px;
+  }
+  .toc-inner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+  }
+  .toc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .75rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 6px 0; }
+  .toc a { color: #94a3b8; text-decoration: none; font-size: .95rem; }
+  .toc a:hover { color: var(--accent); }
+
+  /* ── SECTIONS ── */
+  section { margin: 60px 0; }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .7rem;
+    letter-spacing: .2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.85rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #f1f5f9;
+  }
+  h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin: 28px 0 12px;
+  }
+  p { margin-bottom: 16px; color: #cbd5e1; }
+
+  /* ── ANALOGY BOX ── */
+  .analogy-card {
+    background: linear-gradient(135deg, rgba(249,115,22,.08) 0%, rgba(167,139,250,.06) 100%);
+    border: 1px solid rgba(249,115,22,.3);
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin: 28px 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .analogy-card::before {
+    content: '🏛️';
+    position: absolute;
+    top: 16px; right: 20px;
+    font-size: 2.5rem;
+    opacity: .25;
+  }
+  .analogy-card .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .65rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 10px;
+    display: block;
+  }
+  .analogy-card p { color: #e2c99a; margin: 0; }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: .93rem;
+  }
+  .compare-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    text-align: left;
+  }
+  .compare-table td {
+    padding: 11px 16px;
+    border: 1px solid var(--border);
+    color: #cbd5e1;
+    vertical-align: top;
+  }
+  .compare-table tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+  .yes { color: var(--green); font-family: 'JetBrains Mono', monospace; }
+  .no  { color: var(--red);   font-family: 'JetBrains Mono', monospace; }
+
+  /* ── CODE BLOCK ── */
+  .code-wrap { margin: 20px 0; }
+  .code-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #161d2e;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
+    padding: 9px 16px;
+  }
+  .code-header .dots { display: flex; gap: 6px; }
+  .code-header .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #f87171; }
+  .dot-y { background: #fbbf24; }
+  .dot-g { background: #4ade80; }
+  .code-header .filename {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 0 0 10px 10px;
+    padding: 20px 22px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .82rem;
+    line-height: 1.65;
+  }
+  .c  { color: #6b7280; }           /* comment */
+  .k  { color: var(--accent3); }    /* keyword/key */
+  .s  { color: var(--green); }      /* string */
+  .n  { color: var(--accent2); }    /* number/name */
+  .cmd { color: var(--accent); }    /* command */
+  .out { color: #94a3b8; }          /* output */
+  .ok  { color: var(--green); }
+  .err { color: var(--red); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    display: flex;
+    gap: 14px;
+    padding: 18px 22px;
+    border-radius: 10px;
+    margin: 20px 0;
+    font-size: .93rem;
+    align-items: flex-start;
+  }
+  .callout-info    { background: rgba(0,212,255,.07); border: 1px solid rgba(0,212,255,.2); }
+  .callout-warn    { background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.25); }
+  .callout-danger  { background: rgba(248,113,113,.07); border: 1px solid rgba(248,113,113,.2); }
+  .callout-success { background: rgba(34,211,164,.07); border: 1px solid rgba(34,211,164,.2); }
+  .callout-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+  .callout p { margin: 0; color: #cbd5e1; }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 28px 0;
+    gap: 4px;
+  }
+  .flow-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .78rem;
+    line-height: 1.4;
+    min-width: 120px;
+  }
+  .flow-box .icon { font-size: 1.5rem; display: block; margin-bottom: 6px; }
+  .flow-box.accent { border-color: var(--accent); background: rgba(0,212,255,.06); }
+  .flow-box.orange { border-color: var(--accent2); background: rgba(249,115,22,.06); color: var(--accent2); }
+  .flow-box.purple { border-color: var(--accent3); background: rgba(167,139,250,.06); }
+  .flow-arrow { color: var(--muted); font-size: 1.2rem; padding: 0 6px; }
+
+  /* ── CASE STUDY ── */
+  .case-study {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin: 28px 0;
+  }
+  .case-study-header {
+    background: linear-gradient(90deg, rgba(0,212,255,.12), rgba(167,139,250,.08));
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .case-study-header .cs-icon { font-size: 2rem; }
+  .case-study-header .cs-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+  .case-study-header .cs-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .68rem;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .case-study-body { padding: 24px 28px; }
+  .case-study-body p { color: #b0bec5; }
+
+  /* ── STEP LIST ── */
+  .step-list { list-style: none; counter-reset: steps; margin: 20px 0; }
+  .step-list li {
+    counter-increment: steps;
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    align-items: flex-start;
+  }
+  .step-list li::before {
+    content: counter(steps);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .75rem;
+    font-weight: 700;
+    background: var(--accent);
+    color: #000;
+    border-radius: 50%;
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-list p { margin: 0; color: #b0bec5; }
+  .step-list strong { color: #e2e8f0; }
+
+  /* ── LAB SECTION ── */
+  .lab-header {
+    background: linear-gradient(135deg, rgba(34,211,164,.1), rgba(0,212,255,.06));
+    border: 1px solid rgba(34,211,164,.3);
+    border-radius: 14px 14px 0 0;
+    padding: 22px 28px;
+  }
+  .lab-header .lab-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--green);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .lab-body {
+    border: 1px solid rgba(34,211,164,.3);
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    padding: 28px 28px;
+  }
+
+  /* ── QUIZ ── */
+  .quiz {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin: 28px 0;
+  }
+  .quiz-q {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: #f1f5f9;
+  }
+  .quiz-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin: 6px 0;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: all .2s;
+    font-size: .93rem;
+    color: #94a3b8;
+    user-select: none;
+  }
+  .quiz-option:hover { border-color: var(--accent); color: var(--text); background: rgba(0,212,255,.04); }
+  .quiz-option.correct { border-color: var(--green) !important; color: var(--green) !important; background: rgba(34,211,164,.08) !important; }
+  .quiz-option.wrong   { border-color: var(--red)   !important; color: var(--red)   !important; background: rgba(248,113,113,.08) !important; }
+  .quiz-feedback { margin-top: 12px; font-size: .88rem; display: none; padding: 10px 14px; border-radius: 8px; }
+
+  /* ── DIVIDER ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 40px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+  }
+
+  kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .78em;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    color: var(--accent);
+  }
+
+  .highlight { color: var(--accent); font-weight: 600; }
+  .highlight2 { color: var(--accent2); }
+  .highlight3 { color: var(--accent3); }
+
+  @media(max-width:600px) {
+    .flow { flex-direction: column; align-items: stretch; }
+    .flow-arrow { transform: rotate(90deg); text-align: center; }
+    .compare-table { font-size: .8rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HERO ═══════════════════════════════ -->
+<header class="hero">
+  <div class="hero-label">Kubernetes Deep Dive</div>
+  <h1>Static Pods</h1>
+  <p>The pods that exist before Kubernetes itself — managed directly by the kubelet, independent of the API server.</p>
+  <div class="badge-row">
+    <span class="badge badge-blue">kubelet</span>
+    <span class="badge badge-orange">Control Plane</span>
+    <span class="badge badge-purple">Self-Healing</span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════ TOC ════════════════════════════════ -->
+<nav class="toc">
+  <div class="toc-inner">
+    <div class="toc-title">// Table of Contents</div>
+    <ol>
+      <li><a href="#what">What is a Static Pod?</a></li>
+      <li><a href="#analogy">The Analogy — Night Security Guard</a></li>
+      <li><a href="#how">How Static Pods Work</a></li>
+      <li><a href="#vs">Static Pod vs Regular Pod</a></li>
+      <li><a href="#casestudy">Real-World Case Study — Control Plane Bootstrap</a></li>
+      <li><a href="#lab">Hands-On Lab</a></li>
+      <li><a href="#quiz">Knowledge Check</a></li>
+    </ol>
+  </div>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════════════════════ SECTION 1 ═══════════════════════════ -->
+<section id="what">
+  <span class="section-num">// 01 — Fundamentals</span>
+  <h2>What is a Static Pod?</h2>
+
+  <p>In Kubernetes, most pods are created by submitting a manifest to the <strong>API server</strong>, which then schedules them via the <strong>scheduler</strong> and tracks them in <strong>etcd</strong>. A <span class="highlight">Static Pod</span> is different — it bypasses all of that.</p>
+
+  <p>A static pod is a pod defined by a YAML file placed directly on a <strong>node's filesystem</strong>, in a directory that the <kbd>kubelet</kbd> watches (typically <kbd>/etc/kubernetes/manifests/</kbd>). The kubelet reads that file and starts the pod <em>directly</em>, without ever asking the API server for permission.</p>
+
+  <div class="callout callout-info">
+    <div class="callout-icon">💡</div>
+    <p><strong>Key insight:</strong> The kubelet is the only component that actually runs containers. Everything else in Kubernetes — the scheduler, controller-manager, API server — just <em>tells</em> the kubelet what to do. Static pods let you talk to the kubelet directly, skipping the chain of command.</p>
+  </div>
+
+  <h3>What happens to a static pod in the API server?</h3>
+  <p>When a static pod starts, the kubelet automatically creates a <span class="highlight">mirror pod</span> in the API server so you can see it with <kbd>kubectl get pods</kbd>. However, this mirror pod is read-only — you <strong>cannot</strong> delete or modify it via kubectl. The kubelet owns it.</p>
+
+  <div class="flow">
+    <div class="flow-box">
+      <span class="icon">📄</span>
+      /etc/kubernetes/<br>manifests/
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box accent">
+      <span class="icon">🤖</span>
+      kubelet<br>(watches dir)
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box orange">
+      <span class="icon">📦</span>
+      Container<br>Runtime
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box purple">
+      <span class="icon">🔍</span>
+      Mirror Pod<br>(API Server)
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════ SECTION 2 ═══════════════════════════ -->
+<section id="analogy">
+  <span class="section-num">// 02 — Analogy</span>
+  <h2>The Night Security Guard</h2>
+
+  <div class="analogy-card">
+    <span class="tag">// Real-World Analogy</span>
+    <p>Imagine a <strong>large office building</strong>. During the day, a <em>central security management system</em> (the Kubernetes API server) coordinates all guards, assigns them shifts, and tracks their locations. Guards follow instructions from this system.</p>
+    <br>
+    <p>But at <strong>night</strong>, there's one special guard — the <em>Night Watchman</em>. He doesn't need the central system to tell him to show up. He has a <strong>hardcoded schedule written on a card in his pocket</strong> (the manifest file on disk). He arrives at his post automatically, and if he falls asleep (pod crashes), he wakes himself back up — no dispatcher needed.</p>
+    <br>
+    <p>The central system can <em>see</em> him on the monitor (mirror pod), but it <strong>cannot</strong> reassign him or tell him to leave. Only removing the card from his pocket (deleting the manifest file) makes him stop.</p>
+  </div>
+
+  <p>This is exactly how static pods work. The <strong>kubelet is the Night Watchman</strong>. The <strong>manifest file is the card in his pocket</strong>. The <strong>API server can observe but not control</strong> him.</p>
+
+  <h3>Why does this matter?</h3>
+  <p>This design solves a <span class="highlight2">chicken-and-egg problem</span>: Kubernetes components like the API server, etcd, and the scheduler are themselves run as containers. But to run containers, Kubernetes must already be running. Static pods break this paradox — they let critical system components start themselves before any orchestration layer exists.</p>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════ SECTION 3 ═══════════════════════════ -->
+<section id="how">
+  <span class="section-num">// 03 — Internals</span>
+  <h2>How Static Pods Work</h2>
+
+  <h3>The Manifest Directory</h3>
+  <p>The kubelet's config file (typically <kbd>/var/lib/kubelet/config.yaml</kbd>) specifies where to watch for static pod manifests:</p>
+
+  <div class="code-wrap">
+    <div class="code-header">
+      <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+      <span class="filename">/var/lib/kubelet/config.yaml</span>
+    </div>
+    <pre><span class="k">staticPodPath</span><span class="s">: /etc/kubernetes/manifests</span></pre>
+  </div>
+
+  <p>Any <kbd>.yaml</kbd> or <kbd>.json</kbd> file placed in this directory is picked up by the kubelet automatically — no <kbd>kubectl apply</kbd> needed.</p>
+
+  <h3>Lifecycle</h3>
+  <ul class="step-list">
+    <li><p><strong>File created</strong> in <kbd>/etc/kubernetes/manifests/</kbd> → kubelet detects it within seconds via <em>inotify</em> and starts the pod.</p></li>
+    <li><p><strong>Pod crashes</strong> → kubelet automatically restarts it with exponential back-off, just like any pod with <kbd>restartPolicy: Always</kbd>.</p></li>
+    <li><p><strong>File modified</strong> → kubelet tears down the old pod and creates a new one with the updated spec.</p></li>
+    <li><p><strong>File deleted</strong> → kubelet stops and removes the pod. The mirror pod disappears from the API server too.</p></li>
+    <li><p><strong>Node reboots</strong> → On startup, the kubelet scans the directory and re-creates all static pods before connecting to the API server.</p></li>
+  </ul>
+
+  <div class="callout callout-warn">
+    <div class="callout-icon">⚠️</div>
+    <p><strong>No rescheduling:</strong> Static pods are bound to one specific node. If that node goes down, the pod dies and <em>nothing reschedules it elsewhere</em>. That's the key trade-off.</p>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════ SECTION 4 ═══════════════════════════ -->
+<section id="vs">
+  <span class="section-num">// 04 — Comparison</span>
+  <h2>Static Pod vs Regular Pod</h2>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Static Pod</th>
+        <th>Regular Pod</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Created by</td>
+        <td>kubelet (reads manifest file)</td>
+        <td>Kubernetes API server / controller</td>
+      </tr>
+      <tr>
+        <td>Requires API server</td>
+        <td class="no">✗ No</td>
+        <td class="yes">✓ Yes</td>
+      </tr>
+      <tr>
+        <td>Visible in kubectl</td>
+        <td class="yes">✓ Yes (read-only mirror)</td>
+        <td class="yes">✓ Yes (fully writable)</td>
+      </tr>
+      <tr>
+        <td>Deletable via kubectl</td>
+        <td class="no">✗ No</td>
+        <td class="yes">✓ Yes</td>
+      </tr>
+      <tr>
+        <td>Schedulable to other nodes</td>
+        <td class="no">✗ No (node-bound)</td>
+        <td class="yes">✓ Yes</td>
+      </tr>
+      <tr>
+        <td>Self-healing</td>
+        <td class="yes">✓ Yes (via kubelet)</td>
+        <td class="yes">✓ Yes (via controllers)</td>
+      </tr>
+      <tr>
+        <td>Stored in etcd</td>
+        <td class="no">✗ No</td>
+        <td class="yes">✓ Yes</td>
+      </tr>
+      <tr>
+        <td>Managed by DaemonSet/Deployment</td>
+        <td class="no">✗ No</td>
+        <td class="yes">✓ Yes</td>
+      </tr>
+      <tr>
+        <td>Primary use case</td>
+        <td>Control plane bootstrapping, node agents</td>
+        <td>All workloads</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════ SECTION 5 ═══════════════════════════ -->
+<section id="casestudy">
+  <span class="section-num">// 05 — Case Study</span>
+  <h2>Real-World Case Study</h2>
+
+  <div class="case-study">
+    <div class="case-study-header">
+      <div class="cs-icon">🏗️</div>
+      <div>
+        <div class="cs-title">kubeadm: Bootstrapping a Production Cluster</div>
+        <div class="cs-sub">How every managed Kubernetes cluster (EKS, GKE, AKS) starts its control plane</div>
+      </div>
+    </div>
+    <div class="case-study-body">
+      <p>When <kbd>kubeadm init</kbd> runs to create a new Kubernetes cluster, it faces the classic bootstrap paradox: the API server needs to run to schedule pods, but it needs to run as a pod itself.</p>
+
+      <p><strong>The solution: static pods.</strong> kubeadm writes four manifest files into <kbd>/etc/kubernetes/manifests/</kbd> on the master node:</p>
+
+      <div class="code-wrap">
+        <div class="code-header">
+          <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+          <span class="filename">$ ls /etc/kubernetes/manifests/</span>
+        </div>
+        <pre><span class="ok">etcd.yaml</span>
+<span class="ok">kube-apiserver.yaml</span>
+<span class="ok">kube-controller-manager.yaml</span>
+<span class="ok">kube-scheduler.yaml</span></pre>
+      </div>
+
+      <p>The kubelet starts up, scans this directory, and launches all four control plane components as static pods — <em>before</em> any Kubernetes orchestration exists. Within seconds, the cluster bootstraps itself from nothing.</p>
+
+      <p>This is why on a control plane node you'll see pods like <kbd>kube-apiserver-master-node</kbd> — the suffix is the node name, a telltale sign it's a static pod (the mirror pod naming convention).</p>
+
+      <div class="callout callout-success">
+        <div class="callout-icon">✅</div>
+        <p><strong>Resilience in action:</strong> If the API server pod crashes, the kubelet restarts it automatically — even if the API server itself is down. This is why control planes are so resilient. The watchdog <em>is</em> the process it's watching.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="case-study">
+    <div class="case-study-header">
+      <div class="cs-icon">🌐</div>
+      <div>
+        <div class="cs-title">Edge Computing — Air-Gapped Nodes</div>
+        <div class="cs-sub">IoT gateways running critical services without cluster connectivity</div>
+      </div>
+    </div>
+    <div class="case-study-body">
+      <p>A logistics company runs Kubernetes on 500+ edge nodes inside warehouses. Network partitions happen frequently. The network monitoring agent on each node must keep running even when the node is completely disconnected from the cluster.</p>
+      <p>By deploying the monitoring agent as a <strong>static pod</strong>, it continues to collect metrics, write to local storage, and self-heal even with zero connectivity to the API server. When the network recovers, the data is synced back. A DaemonSet pod would simply be in a disconnected state with no guarantee of local restart.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════ LAB ════════════════════════════════ -->
+<section id="lab">
+  <span class="section-num">// 06 — Hands-On</span>
+  <h2>Lab: Create Your First Static Pod</h2>
+
+  <div class="lab-header">
+    <div class="lab-title">🧪 Lab — Static Pod Lifecycle</div>
+  </div>
+  <div class="lab-body">
+
+    <p><strong>Prerequisites:</strong> A running Kubernetes cluster with node access (minikube, kind, or a real node). You need SSH access to the node where you want the static pod to live.</p>
+
+    <h3>Step 1 — Find the static pod directory</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">node shell</span>
+      </div>
+      <pre><span class="c"># Check kubelet config for staticPodPath</span>
+<span class="cmd">cat /var/lib/kubelet/config.yaml | grep staticPodPath</span>
+
+<span class="out"># Expected output:</span>
+<span class="ok">staticPodPath: /etc/kubernetes/manifests</span>
+
+<span class="c"># If not set, check the kubelet service flags:</span>
+<span class="cmd">ps aux | grep kubelet | grep static</span></pre>
+    </div>
+
+    <h3>Step 2 — Write the static pod manifest</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">/etc/kubernetes/manifests/my-static-nginx.yaml</span>
+      </div>
+      <pre><span class="k">apiVersion</span>: <span class="s">v1</span>
+<span class="k">kind</span>: <span class="s">Pod</span>
+<span class="k">metadata</span>:
+  <span class="k">name</span>: <span class="s">my-static-nginx</span>
+  <span class="k">labels</span>:
+    <span class="k">app</span>: <span class="s">static-demo</span>
+<span class="k">spec</span>:
+  <span class="k">containers</span>:
+  - <span class="k">name</span>: <span class="s">nginx</span>
+    <span class="k">image</span>: <span class="s">nginx:1.25</span>
+    <span class="k">ports</span>:
+    - <span class="k">containerPort</span>: <span class="n">80</span>
+    <span class="k">resources</span>:
+      <span class="k">requests</span>:
+        <span class="k">cpu</span>: <span class="s">"100m"</span>
+        <span class="k">memory</span>: <span class="s">"64Mi"</span>
+      <span class="k">limits</span>:
+        <span class="k">cpu</span>: <span class="s">"200m"</span>
+        <span class="k">memory</span>: <span class="s">"128Mi"</span></pre>
+    </div>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">Write the file to disk</span>
+      </div>
+      <pre><span class="cmd">sudo vim /etc/kubernetes/manifests/my-static-nginx.yaml</span>
+<span class="c"># paste the YAML above and save</span>
+
+<span class="c"># Or use heredoc:</span>
+<span class="cmd">sudo tee /etc/kubernetes/manifests/my-static-nginx.yaml &lt;&lt;'EOF'</span>
+<span class="out">... (paste yaml) ...</span>
+<span class="cmd">EOF</span></pre>
+    </div>
+
+    <h3>Step 3 — Observe the pod appear</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">kubectl (from control plane)</span>
+      </div>
+      <pre><span class="c"># Watch pods in real-time (within ~5 seconds the pod should appear)</span>
+<span class="cmd">kubectl get pods -A -w</span>
+
+<span class="out">NAMESPACE   NAME                           READY   STATUS    RESTARTS   AGE</span>
+<span class="ok">default     my-static-nginx-&lt;node-name&gt;    1/1     Running   0          8s</span>
+
+<span class="c"># Note: the pod name has the NODE NAME appended — that's the mirror pod!</span>
+
+<span class="c"># Describe it — notice "Controlled By: Node/&lt;name&gt;" not a ReplicaSet</span>
+<span class="cmd">kubectl describe pod my-static-nginx-&lt;node-name&gt;</span></pre>
+    </div>
+
+    <h3>Step 4 — Try to delete it via kubectl (it won't work!)</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">The immovable pod</span>
+      </div>
+      <pre><span class="cmd">kubectl delete pod my-static-nginx-&lt;node-name&gt;</span>
+<span class="out">pod "my-static-nginx-&lt;node-name&gt;" deleted</span>
+
+<span class="c"># Wait 3 seconds, then list again...</span>
+<span class="cmd">kubectl get pods</span>
+<span class="ok">my-static-nginx-&lt;node-name&gt;    1/1     Running   0          3s</span>
+
+<span class="c"># 😄 It's back! kubectl deleted the mirror pod, but kubelet recreated it immediately.</span></pre>
+    </div>
+
+    <h3>Step 5 — Simulate a crash / self-healing</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">Kill the container, watch it heal</span>
+      </div>
+      <pre><span class="c"># On the node, find and kill the nginx container</span>
+<span class="cmd">sudo crictl ps | grep my-static-nginx</span>
+<span class="out">abc123def456   nginx:1.25   Running   my-static-nginx   ...</span>
+
+<span class="cmd">sudo crictl stop abc123def456</span>
+
+<span class="c"># Back on control plane — watch the RESTARTS counter increment</span>
+<span class="cmd">kubectl get pods -w</span>
+<span class="ok">my-static-nginx-node   0/1     CrashLoopBackOff   1          4s</span>
+<span class="ok">my-static-nginx-node   1/1     Running            1          7s</span>
+<span class="c"># Restarted automatically by kubelet!</span></pre>
+    </div>
+
+    <h3>Step 6 — Modify the manifest (rolling update)</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">Change image version</span>
+      </div>
+      <pre><span class="c"># On the node, edit the file</span>
+<span class="cmd">sudo sed -i 's/nginx:1.25/nginx:1.26/' \</span>
+  <span class="cmd">/etc/kubernetes/manifests/my-static-nginx.yaml</span>
+
+<span class="c"># kubelet detects the change and recreates the pod</span>
+<span class="cmd">kubectl get pods -w</span>
+<span class="out">my-static-nginx-node   1/1   Terminating   0   2m</span>
+<span class="ok">my-static-nginx-node   1/1   Running       0   5s</span></pre>
+    </div>
+
+    <h3>Step 7 — Delete the static pod (properly)</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">The ONLY way to stop a static pod</span>
+      </div>
+      <pre><span class="c"># On the node, remove the manifest file</span>
+<span class="cmd">sudo rm /etc/kubernetes/manifests/my-static-nginx.yaml</span>
+
+<span class="c"># Pod disappears from the cluster within seconds</span>
+<span class="cmd">kubectl get pods</span>
+<span class="out">No resources found in default namespace.</span>
+<span class="ok"># ✓ Gone for good</span></pre>
+    </div>
+
+    <div class="callout callout-success">
+      <div class="callout-icon">🎉</div>
+      <p><strong>Lab complete!</strong> You've seen: static pod creation, mirror pod naming, kubectl delete resistance, self-healing, live modification, and proper deletion — all the key behaviors of static pods.</p>
+    </div>
+
+    <h3>Bonus: View control plane static pods on kubeadm node</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">Inspect real static pods</span>
+      </div>
+      <pre><span class="c"># On the control plane node:</span>
+<span class="cmd">ls /etc/kubernetes/manifests/</span>
+<span class="ok">etcd.yaml  kube-apiserver.yaml  kube-controller-manager.yaml  kube-scheduler.yaml</span>
+
+<span class="c"># These ARE the Kubernetes control plane — static pods all the way down!</span>
+<span class="cmd">kubectl get pods -n kube-system</span>
+<span class="ok">etcd-master                      1/1   Running   0   10d</span>
+<span class="ok">kube-apiserver-master            1/1   Running   0   10d</span>
+<span class="ok">kube-controller-manager-master   1/1   Running   0   10d</span>
+<span class="ok">kube-scheduler-master            1/1   Running   0   10d</span></pre>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════ QUIZ ═══════════════════════════════ -->
+<section id="quiz">
+  <span class="section-num">// 07 — Knowledge Check</span>
+  <h2>Quick Quiz</h2>
+
+  <div class="quiz">
+    <div class="quiz-q">Q1. You run <code>kubectl delete pod kube-apiserver-master</code>. What happens?</div>
+    <div class="quiz-option" onclick="answer(this,'wrong')">🔴 The API server is permanently deleted</div>
+    <div class="quiz-option" onclick="answer(this,'wrong')">🟡 The pod is deleted and rescheduled on another node</div>
+    <div class="quiz-option" onclick="answer(this,'correct')">🟢 The mirror pod is deleted, but kubelet immediately recreates the static pod</div>
+    <div class="quiz-option" onclick="answer(this,'wrong')">⚪ kubectl returns an error — you cannot delete control plane pods</div>
+    <div class="quiz-feedback" id="fb1"></div>
+  </div>
+
+  <div class="quiz">
+    <div class="quiz-q">Q2. You want to stop a static pod permanently. What is the correct action?</div>
+    <div class="quiz-option" onclick="answer2(this,'wrong')">Add a label <code>kubernetes.io/frozen: "true"</code></div>
+    <div class="quiz-option" onclick="answer2(this,'correct')">Delete or move the manifest file from the staticPodPath directory</div>
+    <div class="quiz-option" onclick="answer2(this,'wrong')">Run <code>kubectl cordon</code> on the node</div>
+    <div class="quiz-option" onclick="answer2(this,'wrong')">Scale the pod to 0 replicas</div>
+    <div class="quiz-feedback" id="fb2"></div>
+  </div>
+
+  <div class="quiz">
+    <div class="quiz-q">Q3. Which of the following is NOT a characteristic of static pods?</div>
+    <div class="quiz-option" onclick="answer3(this,'wrong')">They are managed directly by the kubelet</div>
+    <div class="quiz-option" onclick="answer3(this,'wrong')">They appear as mirror pods in the API server</div>
+    <div class="quiz-option" onclick="answer3(this,'correct')">They can be rescheduled to a different node if the current node fails</div>
+    <div class="quiz-option" onclick="answer3(this,'wrong')">They restart automatically on crash, even without API server connectivity</div>
+    <div class="quiz-feedback" id="fb3"></div>
+  </div>
+</section>
+
+</div><!-- /container -->
+
+<!-- ═══════════════════════════════ FOOTER ════════════════════════════ -->
+<footer>
+  <p>Kubernetes Static Pods — Deep Dive Guide</p>
+  <p style="margin-top:6px;color:#374151">Official docs: kubernetes.io/docs/tasks/configure-pod-container/static-pod</p>
+</footer>
+
+<script>
+  function markOptions(parent, clickedEl, result) {
+    const opts = parent.querySelectorAll('.quiz-option');
+    opts.forEach(o => { o.style.pointerEvents = 'none'; });
+    clickedEl.classList.add(result);
+  }
+
+  function answer(el, result) {
+    const parent = el.closest('.quiz');
+    markOptions(parent, el, result);
+    const fb = document.getElementById('fb1');
+    fb.style.display = 'block';
+    if (result === 'correct') {
+      fb.style.background = 'rgba(34,211,164,.1)';
+      fb.style.color = '#22d3a4';
+      fb.textContent = '✓ Correct! kubectl only deletes the read-only mirror pod. The kubelet sees the manifest file still exists and immediately re-creates the pod.';
+    } else {
+      fb.style.background = 'rgba(248,113,113,.1)';
+      fb.style.color = '#f87171';
+      fb.textContent = '✗ Not quite. kubectl can delete the mirror pod, but the kubelet ignores that and recreates it from the manifest file on disk.';
+    }
+  }
+
+  function answer2(el, result) {
+    const parent = el.closest('.quiz');
+    markOptions(parent, el, result);
+    const fb = document.getElementById('fb2');
+    fb.style.display = 'block';
+    if (result === 'correct') {
+      fb.style.background = 'rgba(34,211,164,.1)';
+      fb.style.color = '#22d3a4';
+      fb.textContent = '✓ Correct! The kubelet watches the manifest directory. Remove the file, and the pod stops — permanently.';
+    } else {
+      fb.style.background = 'rgba(248,113,113,.1)';
+      fb.style.color = '#f87171';
+      fb.textContent = '✗ Incorrect. The only way to stop a static pod is to remove its manifest file from the staticPodPath directory on the node.';
+    }
+  }
+
+  function answer3(el, result) {
+    const parent = el.closest('.quiz');
+    markOptions(parent, el, result);
+    const fb = document.getElementById('fb3');
+    fb.style.display = 'block';
+    if (result === 'correct') {
+      fb.style.background = 'rgba(34,211,164,.1)';
+      fb.style.color = '#22d3a4';
+      fb.textContent = '✓ Correct! Static pods are node-bound. Unlike regular pods managed by a Deployment or DaemonSet, they cannot migrate to another node. This is a key limitation.';
+    } else {
+      fb.style.background = 'rgba(248,113,113,.1)';
+      fb.style.color = '#f87171';
+      fb.textContent = '✗ That IS actually a characteristic. The one that is NOT: static pods cannot be rescheduled — they are permanently tied to their node.';
+    }
+  }
+</script>
+
+</body>
+</html>

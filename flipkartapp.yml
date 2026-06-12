@@ -1,9 +1,0 @@
-apiVersion: flipkart.com/v1
-kind: FlipkartApplication
-
-metadata:
-  name: payment-service
-
-spec:
-  image: nginx
-  replicas: 3

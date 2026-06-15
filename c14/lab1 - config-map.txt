@@ -1,0 +1,149 @@
+How flipkart env can be configured using configmap lab
+
+
+# vi configmap.yml
+
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: flipkart-config
+  namespace: flipkart
+
+data:
+  COMPANY_NAME: "Flipkart"
+  SALE_NAME: "Big Billion Days"
+  PRODUCTS_PER_PAGE: "100"
+  LOG_LEVEL: "INFO"
+
+kubectl apply -f configmap.yml
+
+kubectl get configmap -n flipkart
+# o/p: flipkart-config data: 4
+
+kubectl describe cm flipkart-config -n flipkart
+o/p:
+COMPANY_NAME=Flipkart
+SALE_NAME=Big Billion Days
+PRODUCTS_PER_PAGE=100
+LOG_LEVEL=INFO
+
+
+## now we will create a deployment 
+
+deployment pod --------talk -----configmap
+vi deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-app
+  namespace: flipkart
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product
+  template:
+    metadata:
+      labels:
+        app: product
+    spec:
+      containers:
+
+      - name: product
+
+        image: nginx
+
+        env:
+
+        - name: COMPANY_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: flipkart-config
+              key: COMPANY_NAME
+
+        - name: SALE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: flipkart-config
+              key: SALE_NAME
+
+        - name: PRODUCTS_PER_PAGE
+          valueFrom:
+            configMapKeyRef:
+              name: flipkart-config
+              key: PRODUCTS_PER_PAGE
+
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: flipkart-config
+              key: LOG_LEVEL
+
+        command:
+        - /bin/sh
+        - -c
+
+        args:
+        - |
+          echo "<h1>$COMPANY_NAME</h1>
+          <h2>$SALE_NAME</h2>
+          <h3>Products:$PRODUCTS_PER_PAGE</h3>
+          <h4>Log:$LOG_LEVEL</h4>" > /usr/share/nginx/html/index.html
+
+          nginx -g 'daemon off;'
+
+
+
+kubectl apply -f deployment.yaml
+
+
+### kubectl get deploy -n flipkart
+
+## kubectl get pods -o wide -n flipkart
+now copy the ip address of the pod
+
+curl ipaddressofthepod:80
+
+you will see o/p:
+<h1>Flipkart</h1>
+<h2>Big Billion Days</h2>
+<h3>Products:100</h3>
+<h4>Log:INFO</h4>
+
+### Now lets say i have been asked to change the products from  100 to 50
+
+so rather then changing the code and redeploying pods again...i will make the changes in configmap
+
+kubectl edit cm flipkart-config -n flipkart
+
+#cm : configmap 
+
+change the data from Products :100 to Products : 50
+
+####
+kubectl describe cm flipkart-config -n flipkart
+o/p: products : 50
+
+###
+
+kubectl get pods -o wide
+
+curl ipaddressofpod:80
+you will see product as 50
+
+if by change it is showing as 100...
+
+kubectl rollout restart deployment product-app -n flipkart
+
+kubectl get pods -o wide
+
+curl ipaddressofpod:80
+you will see product as 50
+
+
+
+
+
+ 

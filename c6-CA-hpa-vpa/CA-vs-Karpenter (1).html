@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cluster Autoscaler vs Karpenter</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg: #05070f;
+  --ca: #f97316;
+  --ca-dim: rgba(249,115,22,0.12);
+  --ca-border: rgba(249,115,22,0.3);
+  --kp: #22d3ee;
+  --kp-dim: rgba(34,211,238,0.1);
+  --kp-border: rgba(34,211,238,0.3);
+  --text: #f1f5f9;
+  --muted: #64748b;
+  --dim: #1e293b;
+  --surface: #0f172a;
+  --surface2: #162032;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+}
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  padding: 60px 40px;
+}
+
+/* animated grid */
+.grid-bg {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(34,211,238,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34,211,238,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridShift 20s linear infinite;
+}
+@keyframes gridShift { to { background-position: 60px 60px; } }
+
+/* floating orbs */
+.orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(80px); pointer-events: none;
+  animation: orbFloat 8s ease-in-out infinite alternate;
+}
+.orb1 { width:500px; height:500px; background:rgba(249,115,22,0.06); top:-100px; left:-100px; animation-duration:9s; }
+.orb2 { width:400px; height:400px; background:rgba(34,211,238,0.07); bottom:-80px; right:-80px; animation-duration:11s; animation-delay:-4s; }
+.orb3 { width:300px; height:300px; background:rgba(139,92,246,0.05); top:40%; left:40%; animation-duration:7s; animation-delay:-2s; }
+@keyframes orbFloat { from { transform: translate(0,0) scale(1); } to { transform: translate(30px,20px) scale(1.1); } }
+
+.hero-inner { position:relative; z-index:2; text-align:center; max-width:900px; }
+
+.hero-eyebrow {
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:'Space Mono',monospace; font-size:11px; letter-spacing:0.15em;
+  color:var(--kp); border:1px solid var(--kp-border);
+  background:var(--kp-dim); padding:6px 16px; border-radius:2px;
+  margin-bottom:32px;
+  animation: fadeDown 0.8s ease both;
+}
+
+.hero h1 {
+  font-family:'Bebas Neue', sans-serif;
+  font-size: clamp(60px, 10vw, 120px);
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  margin-bottom: 24px;
+  animation: fadeUp 0.9s ease 0.2s both;
+}
+.hero h1 .ca-word { color: var(--ca); }
+.hero h1 .vs-word { color: var(--muted); font-size:0.5em; vertical-align:middle; }
+.hero h1 .kp-word { color: var(--kp); }
+
+.hero-desc {
+  color: var(--muted); font-size:18px; line-height:1.7; max-width:600px; margin:0 auto 40px;
+  animation: fadeUp 0.9s ease 0.35s both;
+}
+
+.scroll-hint {
+  position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  color:var(--muted); font-size:12px; font-family:'Space Mono',monospace;
+  animation: fadeUp 1s ease 1s both;
+}
+.scroll-arrow { width:1px; height:40px; background:linear-gradient(var(--kp),transparent); animation:scrollPulse 2s ease-in-out infinite; }
+@keyframes scrollPulse { 0%,100%{opacity:0.3;transform:scaleY(1)} 50%{opacity:1;transform:scaleY(1.2)} }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── SECTION ── */
+.section { padding: 100px 40px; max-width: 1200px; margin: 0 auto; }
+.section-label {
+  font-family:'Space Mono',monospace; font-size:11px; letter-spacing:0.15em;
+  color:var(--muted); text-transform:uppercase; margin-bottom:12px;
+}
+.section-title {
+  font-family:'Bebas Neue',sans-serif; font-size:clamp(36px,5vw,64px);
+  line-height:1; margin-bottom:20px;
+}
+.section-sub { color:var(--muted); font-size:16px; line-height:1.7; max-width:600px; }
+
+/* ── ANALOGY SECTION ── */
+.analogy-wrap {
+  display:grid; grid-template-columns:1fr 80px 1fr; gap:0;
+  align-items:stretch; margin-top:60px;
+}
+.analogy-card {
+  border-radius:12px; overflow:hidden;
+  border:1px solid;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.analogy-card:hover { transform:translateY(-4px); }
+.ca-card { border-color:var(--ca-border); }
+.ca-card:hover { box-shadow:0 20px 60px rgba(249,115,22,0.15); }
+.kp-card { border-color:var(--kp-border); }
+.kp-card:hover { box-shadow:0 20px 60px rgba(34,211,238,0.15); }
+
+.card-top {
+  padding:28px; display:flex; align-items:center; gap:14px;
+  border-bottom:1px solid;
+}
+.ca-card .card-top { background:rgba(249,115,22,0.08); border-color:var(--ca-border); }
+.kp-card .card-top { background:rgba(34,211,238,0.07); border-color:var(--kp-border); }
+
+.card-icon { font-size:32px; }
+.card-name { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:0.05em; }
+.ca-card .card-name { color:var(--ca); }
+.kp-card .card-name { color:var(--kp); }
+.card-tagline { font-size:13px; color:var(--muted); margin-top:2px; }
+
+.card-body { padding:28px; background:var(--surface); }
+.analogy-title {
+  font-family:'Space Mono',monospace; font-size:10px;
+  letter-spacing:0.15em; color:var(--muted); margin-bottom:12px;
+}
+.analogy-big { font-size:40px; margin-bottom:12px; }
+.analogy-name { font-size:20px; font-weight:600; margin-bottom:8px; }
+.ca-card .analogy-name { color:var(--ca); }
+.kp-card .analogy-name { color:var(--kp); }
+.analogy-desc { color:var(--muted); font-size:14px; line-height:1.7; }
+
+.vs-divider {
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Bebas Neue',sans-serif; font-size:22px; color:var(--muted);
+  position:relative;
+}
+.vs-divider::before, .vs-divider::after {
+  content:''; position:absolute; width:1px; background:var(--dim);
+  left:50%;
+}
+.vs-divider::before { top:0; bottom:52%; }
+.vs-divider::after { top:52%; bottom:0; }
+.vs-text {
+  background:var(--dim); width:40px; height:40px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; z-index:1;
+  border:1px solid #2d3f55;
+}
+
+/* ── ANIMATED FLOW ── */
+.flow-section {
+  padding:100px 0;
+  border-top:1px solid var(--dim);
+  border-bottom:1px solid var(--dim);
+  background:var(--surface);
+  overflow:hidden;
+}
+.flow-inner { max-width:1200px; margin:0 auto; padding:0 40px; }
+
+.flows { display:grid; grid-template-columns:1fr 1fr; gap:60px; margin-top:60px; }
+
+.flow-card {
+  border:1px solid; border-radius:12px; overflow:hidden;
+}
+.ca-flow { border-color:var(--ca-border); }
+.kp-flow { border-color:var(--kp-border); }
+
+.flow-header {
+  padding:16px 20px; display:flex; align-items:center; gap:10px;
+  border-bottom:1px solid;
+  font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:0.05em;
+}
+.ca-flow .flow-header { background:rgba(249,115,22,0.1); border-color:var(--ca-border); color:var(--ca); }
+.kp-flow .flow-header { background:rgba(34,211,238,0.08); border-color:var(--kp-border); color:var(--kp); }
+
+.flow-steps { padding:20px; background:var(--bg); }
+.flow-step {
+  display:flex; align-items:flex-start; gap:14px;
+  padding:12px 0;
+  border-bottom:1px solid var(--dim);
+  opacity:0; transform:translateX(-10px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.flow-step:last-child { border-bottom:none; }
+.flow-step.visible { opacity:1; transform:translateX(0); }
+
+.step-dot {
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Space Mono',monospace; font-size:11px; font-weight:700;
+  flex-shrink:0; margin-top:2px;
+}
+.ca-flow .step-dot { background:rgba(249,115,22,0.2); color:var(--ca); border:1px solid var(--ca-border); }
+.kp-flow .step-dot { background:rgba(34,211,238,0.15); color:var(--kp); border:1px solid var(--kp-border); }
+
+.step-content {}
+.step-title { font-weight:600; font-size:14px; margin-bottom:3px; }
+.step-detail { color:var(--muted); font-size:13px; line-height:1.5; }
+.step-time {
+  display:inline-block; margin-top:4px;
+  font-family:'Space Mono',monospace; font-size:10px; padding:2px 8px; border-radius:2px;
+}
+.ca-flow .step-time { background:rgba(249,115,22,0.12); color:var(--ca); }
+.kp-flow .step-time { background:rgba(34,211,238,0.1); color:var(--kp); }
+
+/* animated timeline bar */
+.timing-bar { margin-top:20px; padding:16px; background:var(--surface2); border-radius:8px; }
+.timing-label { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); margin-bottom:10px; letter-spacing:0.1em; }
+.timing-track { height:8px; background:var(--dim); border-radius:4px; overflow:hidden; position:relative; }
+.timing-fill {
+  height:100%; border-radius:4px; width:0;
+  transition:width 1.5s cubic-bezier(0.4,0,0.2,1);
+}
+.ca-fill { background:linear-gradient(90deg, var(--ca), rgba(249,115,22,0.4)); }
+.kp-fill { background:linear-gradient(90deg, var(--kp), rgba(34,211,238,0.4)); }
+.timing-total { font-family:'Space Mono',monospace; font-size:11px; margin-top:8px; }
+.ca-flow .timing-total { color:var(--ca); }
+.kp-flow .timing-total { color:var(--kp); }
+
+/* ── RACE ANIMATION ── */
+.race-section { padding:100px 40px; max-width:1200px; margin:0 auto; }
+
+.race-track {
+  background:var(--surface);
+  border:1px solid var(--dim);
+  border-radius:16px;
+  padding:40px;
+  margin-top:50px;
+  position:relative;
+  overflow:hidden;
+}
+
+.race-label {
+  font-family:'Space Mono',monospace; font-size:11px; letter-spacing:0.1em;
+  color:var(--muted); margin-bottom:16px;
+}
+.race-row { display:flex; align-items:center; gap:16px; margin-bottom:20px; }
+.race-row:last-child { margin-bottom:0; }
+.race-name {
+  width:120px; flex-shrink:0;
+  font-family:'Space Mono',monospace; font-size:12px; font-weight:700;
+}
+.ca-name { color:var(--ca); }
+.kp-name { color:var(--kp); }
+
+.race-lane { flex:1; height:48px; background:var(--bg); border-radius:8px; position:relative; overflow:hidden; }
+.race-runner {
+  position:absolute; top:50%; transform:translateY(-50%);
+  font-size:24px; left:-40px;
+  transition:left 0s;
+  white-space:nowrap;
+}
+.race-bar {
+  position:absolute; top:0; left:0; height:100%; border-radius:8px; width:0;
+  display:flex; align-items:center; padding-left:12px;
+  font-family:'Space Mono',monospace; font-size:11px; font-weight:700;
+  transition:width 0s;
+}
+.ca-bar { background:linear-gradient(90deg,rgba(249,115,22,0.3),rgba(249,115,22,0.1)); color:var(--ca); }
+.kp-bar { background:linear-gradient(90deg,rgba(34,211,238,0.25),rgba(34,211,238,0.08)); color:var(--kp); }
+
+.race-flag { flex-shrink:0; font-size:24px; opacity:0.3; }
+.race-flag.done { opacity:1; animation:flagWave 0.5s ease; }
+@keyframes flagWave { 0%{transform:scale(0.5)rotate(-20deg)} 50%{transform:scale(1.3)rotate(10deg)} 100%{transform:scale(1)rotate(0)} }
+
+.race-btn {
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:'Space Mono',monospace; font-size:12px;
+  background:var(--surface2); border:1px solid var(--dim);
+  color:var(--text); padding:10px 20px; border-radius:6px;
+  cursor:pointer; margin-top:24px; transition:all 0.2s;
+}
+.race-btn:hover { border-color:var(--kp); color:var(--kp); }
+
+/* ── COMPARISON TABLE ── */
+.compare-section { padding:100px 40px; max-width:1200px; margin:0 auto; }
+
+.compare-grid {
+  margin-top:50px;
+  display:flex; flex-direction:column; gap:2px;
+  border:1px solid var(--dim); border-radius:12px; overflow:hidden;
+}
+.compare-header {
+  display:grid; grid-template-columns:1.5fr 1fr 1fr;
+  background:var(--surface2);
+  border-bottom:2px solid var(--dim);
+}
+.compare-header > div {
+  padding:16px 20px;
+  font-family:'Space Mono',monospace; font-size:11px; letter-spacing:0.1em; font-weight:700;
+}
+.compare-header .ca-col { color:var(--ca); border-left:1px solid var(--dim); }
+.compare-header .kp-col { color:var(--kp); border-left:1px solid var(--dim); }
+
+.compare-row {
+  display:grid; grid-template-columns:1.5fr 1fr 1fr;
+  background:var(--bg);
+  border-bottom:1px solid var(--dim);
+  transition:background 0.2s;
+}
+.compare-row:last-child { border-bottom:none; }
+.compare-row:hover { background:var(--surface); }
+.compare-row:nth-child(even) { background:rgba(255,255,255,0.01); }
+.compare-row:nth-child(even):hover { background:var(--surface); }
+
+.compare-row > div {
+  padding:14px 20px;
+  font-size:14px; line-height:1.5; vertical-align:top;
+}
+.compare-row .feature { color:var(--text); font-weight:500; }
+.compare-row .ca-val { color:var(--muted); border-left:1px solid var(--dim); }
+.compare-row .kp-val { color:var(--muted); border-left:1px solid var(--dim); }
+.win { color:var(--kp) !important; font-weight:500; }
+.ca-win { color:var(--ca) !important; font-weight:500; }
+
+/* ── WHEN TO USE ── */
+.when-section { padding:60px 40px 100px; max-width:1200px; margin:0 auto; }
+.when-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:50px; }
+.when-card {
+  border-radius:12px; padding:28px; border:1px solid;
+  position:relative; overflow:hidden;
+}
+.when-card::before {
+  content:''; position:absolute; top:-60px; right:-60px;
+  width:200px; height:200px; border-radius:50%; filter:blur(60px);
+  pointer-events:none;
+}
+.ca-when { border-color:var(--ca-border); background:rgba(249,115,22,0.04); }
+.ca-when::before { background:rgba(249,115,22,0.1); }
+.kp-when { border-color:var(--kp-border); background:rgba(34,211,238,0.04); }
+.kp-when::before { background:rgba(34,211,238,0.08); }
+
+.when-icon { font-size:36px; margin-bottom:12px; }
+.when-title { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:0.05em; margin-bottom:16px; }
+.ca-when .when-title { color:var(--ca); }
+.kp-when .when-title { color:var(--kp); }
+.when-list { list-style:none; display:flex; flex-direction:column; gap:10px; }
+.when-list li {
+  display:flex; align-items:flex-start; gap:10px;
+  color:var(--muted); font-size:14px; line-height:1.5;
+}
+.when-list li::before {
+  content:'→'; flex-shrink:0; font-family:'Space Mono',monospace; font-size:12px;
+  margin-top:2px;
+}
+.ca-when .when-list li::before { color:var(--ca); }
+.kp-when .when-list li::before { color:var(--kp); }
+
+/* ── SCROLL REVEAL ── */
+.reveal { opacity:0; transform:translateY(40px); transition:opacity 0.7s ease, transform 0.7s ease; }
+.reveal.visible { opacity:1; transform:translateY(0); }
+
+/* ── FOOTER ── */
+footer {
+  border-top:1px solid var(--dim);
+  padding:40px; text-align:center;
+  color:var(--muted); font-size:13px; font-family:'Space Mono',monospace;
+}
+
+/* ── CONCEPT CALLOUT ── */
+.concept-strip {
+  background:var(--surface);
+  border-top:1px solid var(--dim); border-bottom:1px solid var(--dim);
+  padding:60px 40px;
+  overflow:hidden;
+}
+.concept-inner { max-width:1200px; margin:0 auto; }
+.concept-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--dim); border:1px solid var(--dim); border-radius:12px; overflow:hidden; margin-top:50px; }
+.concept-item { background:var(--bg); padding:28px; transition:background 0.2s; }
+.concept-item:hover { background:var(--surface); }
+.concept-emoji { font-size:28px; margin-bottom:12px; }
+.concept-name { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:0.1em; color:var(--muted); margin-bottom:8px; text-transform:uppercase; }
+.concept-value { font-size:15px; font-weight:500; margin-bottom:6px; }
+.ca-text { color:var(--ca); }
+.kp-text { color:var(--kp); }
+.concept-explain { color:var(--muted); font-size:13px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="grid-bg"></div>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+  <div class="hero-inner">
+    <div class="hero-eyebrow">⎈ Kubernetes Node Scaling · Deep Dive</div>
+    <h1>
+      <span class="ca-word">Cluster<br>Autoscaler</span><br>
+      <span class="vs-word">VS</span><br>
+      <span class="kp-word">Karpenter</span>
+    </h1>
+    <p class="hero-desc">Same goal. Completely different approach. One works through a middleman. The other talks directly to AWS. Here's why it matters.</p>
+  </div>
+  <div class="scroll-hint">
+    <span>scroll to explore</span>
+    <div class="scroll-arrow"></div>
+  </div>
+</section>
+
+<!-- ANALOGY -->
+<section class="section reveal">
+  <div class="section-label">// The Big Idea</div>
+  <h2 class="section-title">Same Problem.<br>Two Different Mindsets.</h2>
+  <p class="section-sub">Both tools add and remove EC2 nodes automatically. But the way they think about the problem is fundamentally different. The analogy makes it crystal clear.</p>
+
+  <div class="analogy-wrap">
+    <!-- CA Card -->
+    <div class="analogy-card ca-card">
+      <div class="card-top">
+        <div class="card-icon">🖥️</div>
+        <div>
+          <div class="card-name">Cluster Autoscaler</div>
+          <div class="card-tagline">The traditional approach — reliable, but slow</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="analogy-title">// ANALOGY</div>
+        <div class="analogy-big">🏨</div>
+        <div class="analogy-name">Traditional Hotel</div>
+        <div class="analogy-desc">
+          Imagine booking a hotel with a travel agent. You call the agent → they check with the hotel → the hotel checks room types (only Standard, Deluxe, Suite available) → room gets assigned → you wait 3 days for confirmation.<br><br>
+          CA works the same way. You need more nodes → CA tells the <strong>Auto Scaling Group (the travel agent)</strong> → ASG spins up an EC2 instance → EC2 joins the cluster. Multiple middlemen. Fixed room types. Slow.
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-divider"><div class="vs-text">VS</div></div>
+
+    <!-- Karpenter Card -->
+    <div class="analogy-card kp-card">
+      <div class="card-top">
+        <div class="card-icon">🚀</div>
+        <div>
+          <div class="card-name">Karpenter</div>
+          <div class="card-tagline">The modern approach — fast, flexible, smart</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="analogy-title">// ANALOGY</div>
+        <div class="analogy-big">🚕</div>
+        <div class="analogy-name">Uber / Ola</div>
+        <div class="analogy-desc">
+          Now imagine Uber. You open the app → it sees exactly what you need (2 people + luggage = XL) → <strong>directly contacts the nearest available driver</strong> → car arrives in 4 minutes. No travel agent. No fixed car types. Direct and fast.<br><br>
+          Karpenter works the same way. Pod needs a node → Karpenter reads the pod's exact requirements → <strong>calls EC2 API directly</strong> → picks the perfect instance type → node ready in under 60 seconds.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KEY CONCEPTS -->
+<div class="concept-strip">
+  <div class="concept-inner">
+    <div class="section-label reveal">// Core Concepts Side By Side</div>
+    <h2 class="section-title reveal">The Architecture Gap</h2>
+    <div class="concept-grid reveal">
+      <div class="concept-item">
+        <div class="concept-emoji">🔗</div>
+        <div class="concept-name">How it finds nodes</div>
+        <div class="concept-value ca-text">CA → Auto Scaling Groups</div>
+        <div class="concept-value kp-text">Karpenter → Direct EC2 API</div>
+        <div class="concept-explain">CA requires pre-configured ASG node groups. Karpenter bypasses ASGs entirely and calls <code style="font-size:11px;background:rgba(255,255,255,0.05);padding:1px 4px;border-radius:2px;">RunInstances</code> directly.</div>
+      </div>
+      <div class="concept-item">
+        <div class="concept-emoji">⏱️</div>
+        <div class="concept-name">Provisioning speed</div>
+        <div class="concept-value ca-text">CA → 3–5 minutes</div>
+        <div class="concept-value kp-text">Karpenter → &lt; 60 seconds</div>
+        <div class="concept-explain">CA has ASG round-trip overhead. Karpenter's direct API call removes 2–4 minutes of ASG lifecycle from the path.</div>
+      </div>
+      <div class="concept-item">
+        <div class="concept-emoji">📦</div>
+        <div class="concept-name">Instance selection</div>
+        <div class="concept-value ca-text">CA → Fixed per node group</div>
+        <div class="concept-value kp-text">Karpenter → Automatic best-fit</div>
+        <div class="concept-explain">CA only uses instances configured in the ASG. Karpenter evaluates 400+ EC2 instance types per scheduling decision.</div>
+      </div>
+      <div class="concept-item">
+        <div class="concept-emoji">🗜️</div>
+        <div class="concept-name">Bin-packing / Consolidation</div>
+        <div class="concept-value ca-text">CA → Very limited</div>
+        <div class="concept-value kp-text">Karpenter → Automatic</div>
+        <div class="concept-explain">Karpenter actively reshuffles pods onto fewer nodes and removes the empties. CA mostly just adds/removes — it doesn't repack.</div>
+      </div>
+      <div class="concept-item">
+        <div class="concept-emoji">💸</div>
+        <div class="concept-name">Spot instance handling</div>
+        <div class="concept-value ca-text">CA → Basic, per node group</div>
+        <div class="concept-value kp-text">Karpenter → Native, smart fallback</div>
+        <div class="concept-explain">Karpenter handles spot interruptions via SQS, automatically falls back to on-demand if spot unavailable — in one NodePool config.</div>
+      </div>
+      <div class="concept-item">
+        <div class="concept-emoji">🏗️</div>
+        <div class="concept-name">Config model</div>
+        <div class="concept-value ca-text">CA → Node groups (ASGs)</div>
+        <div class="concept-value kp-text">Karpenter → NodePool + EC2NodeClass</div>
+        <div class="concept-explain">CA needs one ASG per instance type combination. Karpenter uses one NodePool that can express all your requirements in a single object.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW ANIMATIONS -->
+<div class="flow-section">
+  <div class="flow-inner">
+    <div class="section-label reveal">// Step-by-Step Flow</div>
+    <h2 class="section-title reveal">What Happens When a Pod Can't Schedule?</h2>
+    <p class="section-sub reveal">Follow each tool's journey from "pod is Pending" to "pod is Running".</p>
+
+    <div class="flows">
+      <!-- CA flow -->
+      <div class="flow-card ca-flow reveal">
+        <div class="flow-header">🖥️ Cluster Autoscaler Flow</div>
+        <div class="flow-steps" id="ca-steps">
+          <div class="flow-step">
+            <div class="step-dot">1</div>
+            <div class="step-content">
+              <div class="step-title">Pod enters Pending state</div>
+              <div class="step-detail">Kubernetes scheduler cannot find a node with enough CPU/memory. Pod waits.</div>
+              <span class="step-time">0s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">2</div>
+            <div class="step-content">
+              <div class="step-title">CA polls the cluster</div>
+              <div class="step-detail">CA checks every 10 seconds for unschedulable pods. It sees the Pending pod.</div>
+              <span class="step-time">~30s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">3</div>
+            <div class="step-content">
+              <div class="step-title">CA simulates scheduling</div>
+              <div class="step-detail">CA checks each pre-configured node group to see which one can fit the pod. Only looks at existing ASG instance types.</div>
+              <span class="step-time">~35s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">4</div>
+            <div class="step-content">
+              <div class="step-title">CA tells ASG to scale up</div>
+              <div class="step-detail">Calls <code style="font-size:11px">SetDesiredCapacity</code> on the Auto Scaling Group. ASG now handles the rest.</div>
+              <span class="step-time">~40s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">5</div>
+            <div class="step-content">
+              <div class="step-title">ASG launches EC2 instance</div>
+              <div class="step-detail">ASG calls its own EC2 API, uses the Launch Template, waits for instance health checks.</div>
+              <span class="step-time">~2 min</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">6</div>
+            <div class="step-content">
+              <div class="step-title">Node registers with cluster</div>
+              <div class="step-detail">EC2 boots, kubelet starts, node joins EKS. Pod finally gets scheduled.</div>
+              <span class="step-time" style="background:rgba(249,115,22,0.2)">~4–5 min total</span>
+            </div>
+          </div>
+        </div>
+        <div style="padding:0 20px 20px;">
+          <div class="timing-bar">
+            <div class="timing-label">TOTAL PROVISIONING TIME</div>
+            <div class="timing-track"><div class="timing-fill ca-fill" id="ca-bar"></div></div>
+            <div class="timing-total">⏱ 3–5 minutes</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Karpenter flow -->
+      <div class="flow-card kp-flow reveal">
+        <div class="flow-header">🚀 Karpenter Flow</div>
+        <div class="flow-steps" id="kp-steps">
+          <div class="flow-step">
+            <div class="step-dot">1</div>
+            <div class="step-content">
+              <div class="step-title">Pod enters Pending state</div>
+              <div class="step-detail">Kubernetes scheduler cannot find a node with enough CPU/memory. Pod waits.</div>
+              <span class="step-time">0s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">2</div>
+            <div class="step-content">
+              <div class="step-title">Karpenter watches instantly</div>
+              <div class="step-detail">Karpenter uses a Kubernetes watch — reacts in near real-time, not on a polling interval.</div>
+              <span class="step-time">~1s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">3</div>
+            <div class="step-content">
+              <div class="step-title">Evaluates ALL instance types</div>
+              <div class="step-detail">Reads the pod's exact resource needs, node selectors, and taints. Evaluates 400+ EC2 types to find the best fit.</div>
+              <span class="step-time">~3s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">4</div>
+            <div class="step-content">
+              <div class="step-title">Calls EC2 API directly</div>
+              <div class="step-detail">Calls <code style="font-size:11px">RunInstances</code> directly — no ASG middleman. Creates a NodeClaim to track the node.</div>
+              <span class="step-time">~5s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">5</div>
+            <div class="step-content">
+              <div class="step-title">EC2 instance boots</div>
+              <div class="step-detail">Instance starts, user-data runs, kubelet starts. Karpenter has already pre-registered the node.</div>
+              <span class="step-time">~45s</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-dot">6</div>
+            <div class="step-content">
+              <div class="step-title">Node ready. Pod scheduled.</div>
+              <div class="step-detail">Node joins the cluster, pod binds immediately. Karpenter applies labels and taints from NodePool spec.</div>
+              <span class="step-time" style="background:rgba(34,211,238,0.15)">~60s total</span>
+            </div>
+          </div>
+        </div>
+        <div style="padding:0 20px 20px;">
+          <div class="timing-bar">
+            <div class="timing-label">TOTAL PROVISIONING TIME</div>
+            <div class="timing-track"><div class="timing-fill kp-fill" id="kp-bar"></div></div>
+            <div class="timing-total">⏱ Under 60 seconds</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RACE DEMO -->
+<section class="race-section reveal">
+  <div class="section-label">// Visual Demo</div>
+  <h2 class="section-title">The Speed Race</h2>
+  <p class="section-sub">Press Start to simulate how long each takes to provision a new node when a pod is Pending.</p>
+
+  <div class="race-track">
+    <div class="race-label">// NODE PROVISIONING RACE — pod is Pending at 0:00</div>
+
+    <div class="race-row">
+      <div class="race-name ca-name">CA</div>
+      <div class="race-lane">
+        <div class="race-bar ca-bar" id="ca-race-bar"></div>
+        <div class="race-runner" id="ca-runner">🖥️</div>
+      </div>
+      <div class="race-flag" id="ca-flag">🏁</div>
+    </div>
+
+    <div class="race-row">
+      <div class="race-name kp-name">Karpenter</div>
+      <div class="race-lane">
+        <div class="race-bar kp-bar" id="kp-race-bar"></div>
+        <div class="race-runner" id="kp-runner">🚀</div>
+      </div>
+      <div class="race-flag" id="kp-flag">🏁</div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <button class="race-btn" id="race-btn" onclick="startRace()">▶ Start Race</button>
+      <div id="race-status" style="font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);"></div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON TABLE -->
+<section class="compare-section reveal">
+  <div class="section-label">// Full Comparison</div>
+  <h2 class="section-title">Head-to-Head</h2>
+
+  <div class="compare-grid">
+    <div class="compare-header">
+      <div style="color:var(--muted)">FEATURE</div>
+      <div class="ca-col">🖥️ CLUSTER AUTOSCALER</div>
+      <div class="kp-col">🚀 KARPENTER</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Provisioning speed</div>
+      <div class="ca-val ca-win">3–5 minutes</div>
+      <div class="kp-val win">&lt; 60 seconds ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Works through</div>
+      <div class="ca-val">Auto Scaling Groups (middleman)</div>
+      <div class="kp-val win">Direct EC2 API ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Instance type flexibility</div>
+      <div class="ca-val">Fixed — one ASG per instance type</div>
+      <div class="kp-val win">Automatic — picks best from 400+ ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Configuration</div>
+      <div class="ca-val ca-win">Simpler — just tag ASGs</div>
+      <div class="kp-val">More setup (IAM, NodePool, EC2NodeClass)</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Node consolidation</div>
+      <div class="ca-val">Basic / not automatic</div>
+      <div class="kp-val win">Automatic bin-packing ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Spot instance support</div>
+      <div class="ca-val">Separate node group per capacity type</div>
+      <div class="kp-val win">Native fallback in one NodePool ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">ARM / Graviton instances</div>
+      <div class="ca-val">Separate ASG required</div>
+      <div class="kp-val win">Auto-selected per pod architecture ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Spot interruption handling</div>
+      <div class="ca-val">Basic</div>
+      <div class="kp-val win">Native via SQS queue ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Cloud support</div>
+      <div class="ca-val ca-win">Multi-cloud (AWS, GCP, Azure) ✓</div>
+      <div class="kp-val">AWS EKS (community ports for others)</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Cost optimisation</div>
+      <div class="ca-val">Manual node group tuning</div>
+      <div class="kp-val win">Automatic — right-size + consolidate ✓</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Maturity / stability</div>
+      <div class="ca-val ca-win">Battle-tested, years of production use ✓</div>
+      <div class="kp-val">GA since 2023, rapidly maturing</div>
+    </div>
+    <div class="compare-row">
+      <div class="feature">Best for</div>
+      <div class="ca-val ca-win">Multi-cloud, simpler setups</div>
+      <div class="kp-val win">EKS production — speed + cost savings ✓</div>
+    </div>
+  </div>
+</section>
+
+<!-- WHEN TO USE -->
+<section class="when-section">
+  <div class="section-label reveal">// Decision Guide</div>
+  <h2 class="section-title reveal">When to Use Which?</h2>
+
+  <div class="when-grid">
+    <div class="when-card ca-when reveal">
+      <div class="when-icon">🖥️</div>
+      <div class="when-title">Use Cluster Autoscaler when...</div>
+      <ul class="when-list">
+        <li>You are running on multiple clouds (GCP, Azure, AWS) and need a single tool</li>
+        <li>Your team is new to Kubernetes and wants simpler setup with fewer IAM requirements</li>
+        <li>You already have well-configured ASG node groups and don't want to migrate</li>
+        <li>Speed of provisioning is not a critical requirement</li>
+        <li>You need the most battle-tested, production-proven option</li>
+      </ul>
+    </div>
+    <div class="when-card kp-when reveal">
+      <div class="when-icon">🚀</div>
+      <div class="when-title">Use Karpenter when...</div>
+      <ul class="when-list">
+        <li>You are on EKS and want maximum speed — under 60s node provisioning</li>
+        <li>Your workloads have variable resource shapes (different CPU/memory per service)</li>
+        <li>You want to mix spot and on-demand automatically with smart fallback</li>
+        <li>Cost optimisation is a priority — Karpenter's consolidation saves 20–40%</li>
+        <li>You want to use Graviton (ARM) instances selectively without managing separate node groups</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  ⎈ Cluster Autoscaler vs Karpenter · Kubernetes Node Autoscaling · EKS Deep Dive
+</footer>
+
+<script>
+// ── SCROLL REVEAL ──
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+
+      // trigger flow step animations
+      if (e.target.classList.contains('flow-card')) {
+        const steps = e.target.querySelectorAll('.flow-step');
+        steps.forEach((s, i) => {
+          setTimeout(() => s.classList.add('visible'), i * 120);
+        });
+        // timing bars
+        setTimeout(() => {
+          const bar = e.target.querySelector('.timing-fill');
+          if (bar) {
+            if (bar.classList.contains('ca-fill')) bar.style.width = '90%';
+            else bar.style.width = '20%';
+          }
+        }, steps.length * 120 + 200);
+      }
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.reveal, .flow-card').forEach(el => observer.observe(el));
+
+// ── RACE ──
+let raceRunning = false;
+
+function startRace() {
+  if (raceRunning) return;
+  raceRunning = true;
+
+  const btn = document.getElementById('race-btn');
+  const status = document.getElementById('race-status');
+  btn.textContent = '⏳ Racing...';
+  btn.disabled = true;
+
+  // reset
+  const caBar = document.getElementById('ca-race-bar');
+  const kpBar = document.getElementById('kp-race-bar');
+  const caRunner = document.getElementById('ca-runner');
+  const kpRunner = document.getElementById('kp-runner');
+  const caFlag = document.getElementById('ca-flag');
+  const kpFlag = document.getElementById('kp-flag');
+
+  caBar.style.transition = 'none'; kpBar.style.transition = 'none';
+  caRunner.style.transition = 'none'; kpRunner.style.transition = 'none';
+  caBar.style.width = '0'; kpBar.style.width = '0';
+  caRunner.style.left = '-40px'; kpRunner.style.left = '-40px';
+  caFlag.classList.remove('done'); kpFlag.classList.remove('done');
+  status.textContent = '';
+
+  // get lane widths
+  const lane = document.querySelector('.race-lane');
+  const w = lane.offsetWidth;
+
+  setTimeout(() => {
+    // Karpenter finishes in ~2s (represents 60s real)
+    kpBar.style.transition = 'width 2s cubic-bezier(0.4,0,0.2,1)';
+    kpRunner.style.transition = 'left 2s cubic-bezier(0.4,0,0.2,1)';
+    kpBar.style.width = '100%';
+    kpRunner.style.left = (w - 30) + 'px';
+
+    // CA finishes in ~8s (represents 5 min real)
+    caBar.style.transition = 'width 8s cubic-bezier(0.2,0,0.8,1)';
+    caRunner.style.transition = 'left 8s cubic-bezier(0.2,0,0.8,1)';
+    caBar.style.width = '100%';
+    caRunner.style.left = (w - 30) + 'px';
+  }, 100);
+
+  // Karpenter wins at 2s
+  setTimeout(() => {
+    kpBar.textContent = '';
+    kpFlag.classList.add('done');
+    status.textContent = '🚀 Karpenter: Node Ready! (~60s real time)';
+    status.style.color = 'var(--kp)';
+  }, 2100);
+
+  // CA finishes at 8s
+  setTimeout(() => {
+    caBar.textContent = '';
+    caFlag.classList.add('done');
+    status.textContent = '🏁 Both done — Karpenter was 5× faster!';
+    status.style.color = 'var(--muted)';
+    btn.textContent = '↺ Race Again';
+    btn.disabled = false;
+    raceRunning = false;
+  }, 8100);
+
+  // live timer
+  let t = 0;
+  const timer = setInterval(() => {
+    t++;
+    if (!raceRunning || t > 8) { clearInterval(timer); return; }
+    const real_ca = Math.round(t * 37.5); // ~300s max
+    const real_kp = Math.min(Math.round(t * 7.5), 60); // ~60s max
+    if (t < 2) status.textContent = `⏱ Karpenter: ${real_kp}s  |  CA: ${real_ca}s`;
+  }, 1000);
+}
+</script>
+</body>
+</html>

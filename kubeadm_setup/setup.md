@@ -164,3 +164,5 @@ kubectl label node ip-172-31-32-89 node-role.kubernetes.io/worker=
 
 # Check Nodes
 kubectl get nodes
+
+allow 6443 and 179 for BGP

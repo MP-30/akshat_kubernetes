@@ -1,0 +1,2091 @@
+================================================================================
+DOCKER & KUBERNETES REAL-TIME INTERVIEW QUESTIONS
+From Google, Accenture, Wipro, CTS, TCS, Infosys, etc.
+================================================================================
+© AG — All Rights Reserved
+
+================================================================================
+DOCKER INTERVIEW QUESTIONS (1-10)
+================================================================================
+
+Q1. GOOGLE - Docker Image vs Container Difference & Layer Caching
+================================================================================
+Question: 
+Explain Docker images vs containers. How does Docker layer caching work and 
+why is Dockerfile instruction order critical for optimization?
+
+Answer:
+Docker Image: 
+- A read-only template containing OS, dependencies, application code, and metadata
+- Built from Dockerfile instructions (FROM, RUN, COPY, etc.)
+- Each instruction creates a new layer
+- Immutable once created
+
+Docker Container:
+- A running instance of an image
+- Has writable filesystem layer on top of image layers
+- Isolated process with its own network, storage, PID space
+- Ephemeral by default
+
+Layer Caching:
+- Docker caches each layer based on Dockerfile instruction and source files
+- If an instruction hasn't changed and source files are same, Docker reuses cached layer
+- If layer changes, ALL subsequent layers are rebuilt (invalidated)
+- Layers are read from top to bottom during build
+
+Why Instruction Order Matters:
+- Expensive operations (RUN apt-get update, npm install) should come AFTER stable COPY/FROM
+- Frequently changing files should be copied last
+- This prevents cache invalidation for stable dependencies
+
+Practical Solution - Optimized Dockerfile:
+```dockerfile
+# BAD PRACTICE - Cache invalidation
+FROM ubuntu:20.04
+COPY . /app                    # If ANY file changes, everything below rebuilds
+RUN apt-get update && apt-get install -y python3 pip
+RUN pip install -r requirements.txt
+
+# GOOD PRACTICE - Optimize layer caching
+FROM ubuntu:20.04
+RUN apt-get update && apt-get install -y python3 pip    # Layer 1 - stable
+COPY requirements.txt /app/requirements.txt              # Layer 2 - stable
+RUN pip install -r /app/requirements.txt                 # Layer 3 - stable
+COPY . /app                                              # Layer 4 - changes frequently
+WORKDIR /app
+CMD ["python3", "app.py"]
+```
+
+Real-world Scenario:
+When you change app.py, only the last COPY layer is rebuilt. Dependencies aren't 
+reinstalled. Saves 5-10 minutes per build in production.
+
+---
+
+Q2. ACCENTURE - Multi-stage Docker Build & Size Optimization
+================================================================================
+Question:
+Our production Docker image is 1.2GB for a simple Python Flask app. 
+How would you optimize it using multi-stage builds?
+
+Answer:
+Multi-stage Build: Use multiple FROM statements to separate build and runtime 
+environments. Only final stage is pushed to registry.
+
+Why it Matters:
+- Build stage may need compilers, dev tools, dependencies, test frameworks
+- Runtime stage only needs the compiled binary/code and runtime dependencies
+- Reduces final image size by 70-90%
+
+Practical Solution:
+```dockerfile
+# STAGE 1 - Builder stage
+FROM python:3.9 as builder
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+COPY . .
+RUN python -m py_compile *.py   # Compile Python files
+
+# STAGE 2 - Runtime stage (final)
+FROM python:3.9-slim            # Use slim variant
+WORKDIR /app
+COPY --from=builder /build/dist/ .
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+EXPOSE 5000
+CMD ["python", "app.py"]
+```
+
+Comparison:
+- BEFORE: 1.2 GB (includes compiler, dev tools, test files)
+- AFTER: 180 MB (only runtime essentials)
+
+Additional Optimization:
+Use .dockerignore file:
+```
+.git
+.gitignore
+.pytest_cache
+venv/
+*.pyc
+__pycache__
+.env
+node_modules/
+```
+
+Real-world Impact:
+Faster deployment (180MB vs 1.2GB), faster image pulls across regions, 
+reduced storage costs on Docker registry.
+
+---
+
+Q3. WIPRO - Docker Networking Modes (Bridge, Host, Overlay)
+================================================================================
+Question:
+Explain Docker networking modes. When would you use bridge vs host vs overlay?
+What's the difference between -p 8080:80 and the host network mode?
+
+Answer:
+DOCKER NETWORKING MODES:
+
+1. BRIDGE (Default)
+   - Isolated network bridge for each container
+   - Containers get IP from bridge subnet (default 172.17.0.0/16)
+   - Port mapping required to access from host
+   - Communication: container → host via gateway
+   - Use Case: Most applications, microservices on single host
+
+2. HOST
+   - Container shares host's network namespace
+   - No network isolation
+   - Direct access to host's ports/network interfaces
+   - No port mapping needed
+   - Use Case: High-performance apps, monitoring tools
+
+3. OVERLAY
+   - For Docker Swarm/Kubernetes across multiple hosts
+   - Encrypted communication between containers on different nodes
+   - Use Case: Distributed systems, multi-host deployments
+
+Practical Solution:
+
+BRIDGE MODE (Default):
+```bash
+# Port mapping: container port 80 exposed as host port 8080
+docker run -d -p 8080:80 nginx
+
+# Access: http://localhost:8080 → container port 80
+# Internally: container IP is 172.17.0.2
+```
+
+HOST MODE:
+```bash
+# Container listens directly on host ports
+docker run -d --network host nginx
+
+# Access: http://localhost:80 (directly on host)
+# Performance: No overhead, but security risk if untrusted image
+```
+
+Create Custom Bridge:
+```bash
+# Default bridge has limitations (no container hostname resolution)
+docker network create --driver bridge my-network
+docker run -d --network my-network --name web nginx
+docker run -d --network my-network --name app myapp
+
+# Inside 'app' container:
+ping web  # Works! Containers can resolve each other by name
+```
+
+Key Difference - Port Mapping vs Host Mode:
+-p 8080:80   → Container has isolated network, port 8080 on host forwards to container:80
+--network host → Container shares host network, listens directly on host:80 (no mapping)
+
+Real-world Scenario:
+- Microservices on single machine: Bridge + port mapping
+- Monitoring tool (Prometheus): Host mode for direct access to metrics
+- Production Kubernetes: Overlay networks for pod communication
+
+---
+
+Q4. CTS (Cognizant) - Docker Volume Management & Data Persistence
+================================================================================
+Question:
+A container is deleted and all data is lost. How do you persist data in Docker?
+Explain named volumes vs bind mounts vs tmpfs. Which is best for databases?
+
+Answer:
+DATA PERSISTENCE METHODS:
+
+1. NAMED VOLUMES
+   - Managed by Docker daemon
+   - Stored in /var/lib/docker/volumes/
+   - Portable, easier to backup
+   - Best for production databases
+
+2. BIND MOUNTS
+   - Direct path from host to container
+   - Host path can be anywhere on filesystem
+   - Performance overhead
+   - Useful for development
+
+3. TMPFS
+   - In-memory mount (RAM-based)
+   - Data lost on container stop
+   - Fast but ephemeral
+   - For temporary files, caches
+
+Practical Solution:
+
+NAMED VOLUME (For Production):
+```bash
+# Create named volume
+docker volume create mydb-data
+
+# Run container with named volume
+docker run -d \
+  --name mysql-container \
+  -e MYSQL_ROOT_PASSWORD=secret \
+  -v mydb-data:/var/lib/mysql \
+  mysql:8.0
+
+# Data persists even after container deletion
+docker rm mysql-container
+docker volume ls  # mydb-data still exists
+
+# Inspect volume location
+docker volume inspect mydb-data
+# Output shows /var/lib/docker/volumes/mydb-data/_data
+
+# Restore to new container
+docker run -d --name mysql-new -v mydb-data:/var/lib/mysql mysql:8.0
+```
+
+BIND MOUNT (For Development):
+```bash
+# Mount host directory into container
+docker run -d \
+  -v /home/user/app-source:/app \
+  -p 5000:5000 \
+  myapp:latest
+
+# Live code editing: changes on host reflect in running container
+```
+
+TMPFS (For Temporary Data):
+```bash
+docker run -d \
+  --tmpfs /tmp \
+  --tmpfs /dev/shm:size=512m \
+  myapp:latest
+
+# /tmp in container is in RAM, lost on container stop
+```
+
+Complete Database Example:
+```bash
+# Create volumes for MySQL
+docker volume create mysql-data
+docker volume create mysql-config
+
+# Run production MySQL
+docker run -d \
+  --name production-db \
+  --restart always \
+  -e MYSQL_ROOT_PASSWORD=Strong@Pass123 \
+  -v mysql-data:/var/lib/mysql \
+  -v mysql-config:/etc/mysql/conf.d \
+  -v /path/to/backups:/backups \
+  -p 3306:3306 \
+  mysql:8.0 \
+  --max_connections=1000 \
+  --character-set-server=utf8mb4
+
+# Backup database
+docker exec production-db mysqldump -u root -pStrong@Pass123 --all-databases > backup.sql
+
+# Restore from backup
+docker run --rm \
+  -v mysql-data:/var/lib/mysql \
+  -v /path/to/backup.sql:/backup.sql \
+  mysql:8.0 sh -c 'mysql -u root -pPassword < /backup.sql'
+```
+
+Which is Best for Databases?
+NAMED VOLUMES - Always for production
+- Managed by Docker, survives container deletion
+- Easy backup/restore
+- Portable across hosts
+- Better than bind mounts for performance
+
+Real-world Disaster Scenario:
+Without volumes: Data lost when container crashes
+With named volumes: Restart container, data still there
+
+---
+
+Q5. TCS (Tata Consultancy) - Docker Compose for Multi-container Applications
+================================================================================
+Question:
+How do you run a complete application stack (frontend, backend, database, cache) 
+in Docker? Show docker-compose example for a 3-tier application.
+
+Answer:
+Docker Compose: Tool to define and run multi-container Docker applications using 
+YAML file. Handles networking, volumes, environment variables, and dependencies 
+between containers.
+
+Practical Solution - 3-Tier Application Stack:
+
+docker-compose.yml:
+```yaml
+version: '3.9'
+
+services:
+  
+  # Frontend - React/Nginx
+  frontend:
+    image: node:16 as builder
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://backend:8000
+    networks:
+      - app-network
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/src:/app/src  # Development hot-reload
+
+  # Backend - Python/Django
+  backend:
+    image: python:3.9
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/appdb
+      - REDIS_URL=redis://cache:6379
+      - DEBUG=False
+    networks:
+      - app-network
+    depends_on:
+      - postgres
+      - cache
+    volumes:
+      - ./backend:/app
+      - backend-logs:/var/log/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=appdb
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  cache:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    volumes:
+      - cache-data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres-data:
+  cache-data:
+  backend-logs:
+
+networks:
+  app-network:
+    driver: bridge
+```
+
+Running the Stack:
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f backend
+
+# Check service status
+docker-compose ps
+
+# Access services
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000
+# Database: localhost:5432
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (data loss!)
+docker-compose down -v
+
+# Rebuild images after code changes
+docker-compose up -d --build
+```
+
+Frontend Dockerfile (React):
+```dockerfile
+FROM node:16 AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 3000
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+Backend Dockerfile (Django):
+```dockerfile
+FROM python:3.9
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8000
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "config.wsgi:application"]
+```
+
+Real-world Benefits:
+- One command (docker-compose up) starts entire application
+- Automatic networking between containers
+- Service discovery by container name
+- Environment isolation (dev, staging, prod configs)
+- Easy onboarding for new developers
+
+---
+
+Q6. INFOSYS - Docker Security Best Practices & Vulnerabilities
+================================================================================
+Question:
+Security audit found Docker images with known CVEs. How do you implement 
+Docker security? Show how to scan images, use minimal base images, and 
+run containers as non-root.
+
+Answer:
+DOCKER SECURITY LAYER:
+
+1. Image Vulnerabilities: Outdated dependencies
+2. Insecure Registries: Unencrypted image storage
+3. Container Privilege Escalation: Running as root
+4. Exposed Secrets: API keys in images
+5. Network Exposure: Ports open to public
+
+Practical Solution:
+
+SCAN IMAGES FOR VULNERABILITIES:
+```bash
+# Install Trivy (Open-source vulnerability scanner)
+sudo apt install trivy
+
+# Scan local image
+trivy image myapp:1.0
+
+# Scan and output report
+trivy image --format sarif --output report.json myapp:1.0
+
+# Scan during build (CI/CD)
+trivy image --severity HIGH,CRITICAL myapp:1.0
+
+# If vulnerabilities found, exit with error
+trivy image --exit-code 1 --severity HIGH myapp:1.0
+```
+
+SECURE DOCKERFILE:
+```dockerfile
+# Bad: Large base image, runs as root
+FROM ubuntu:20.04
+RUN apt-get update && apt-get install -y python3 pip
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . /app
+WORKDIR /app
+CMD ["python3", "app.py"]
+
+# Good: Minimal image, non-root user, no secrets
+FROM python:3.9-alpine  # Alpine = 40MB vs Ubuntu = 77MB
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
+# Copy requirements as non-root won't work during RUN
+# So install first as root, then switch user
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+COPY --chown=appuser:appuser . /app
+EXPOSE 8000
+CMD ["python3", "app.py"]
+```
+
+PREVENT SECRETS IN IMAGES:
+```bash
+# Bad: Secrets in Dockerfile
+RUN npm install
+ENV DATABASE_PASSWORD=secret123  # Visible in image history!
+
+# Good: Use build secrets (Docker 18.04+)
+# In docker-compose.yml
+```
+
+docker-compose.yml with Secrets:
+```yaml
+services:
+  app:
+    build:
+      context: .
+      secrets:
+        - db_password
+    environment:
+      - DATABASE_PASSWORD_FILE=/run/secrets/db_password
+
+secrets:
+  db_password:
+    file: ./db_password.txt
+```
+
+Dockerfile with secret:
+```dockerfile
+FROM python:3.9
+WORKDIR /app
+RUN --mount=type=secret,id=db_password \
+    DB_PASS=$(cat /run/secrets/db_password) && \
+    echo "Password is set" && \
+    unset DB_PASS
+COPY . .
+CMD ["python3", "app.py"]
+```
+
+RUNTIME SECURITY:
+```bash
+# 1. Run as read-only filesystem (immutable)
+docker run -d \
+  --read-only \
+  --tmpfs /tmp \
+  --tmpfs /var/run \
+  myapp:latest
+
+# 2. Limit CPU and memory
+docker run -d \
+  --memory="512m" \
+  --cpus="0.5" \
+  myapp:latest
+
+# 3. Drop unnecessary capabilities
+docker run -d \
+  --cap-drop=ALL \
+  --cap-add=NET_BIND_SERVICE \
+  nginx:latest
+
+# 4. Disable privileged mode
+docker run -d \
+  --security-opt=no-new-privileges:true \
+  myapp:latest
+
+# 5. Use security scanning in registry
+# Example: Docker Hub scans on push
+docker push myregistry/myapp:1.0  # Automatic vulnerability scan
+
+# 6. Sign images (Docker Content Trust)
+export DOCKER_CONTENT_TRUST=1
+docker push myregistry/myapp:1.0  # Cryptographically signed
+```
+
+SCAN IMAGE DURING CI/CD:
+```bash
+# In GitHub Actions / GitLab CI
+name: Build and Scan
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build image
+        run: docker build -t myapp:${{ github.sha }} .
+      
+      - name: Scan with Trivy
+        run: |
+          trivy image --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            myapp:${{ github.sha }}
+      
+      - name: Push if scan passes
+        if: success()
+        run: docker push myapp:${{ github.sha }}
+```
+
+Real-world Compromise:
+Attacker found old Docker image with Laravel with hardcoded AWS credentials 
+(visible in image history). Stolen credentials gave access to production S3 buckets.
+
+Prevention:
+- Always use secrets management (AWS Secrets Manager, Vault)
+- Use Trivy/Grype scanners in CI/CD pipeline
+- Run containers as non-root, read-only when possible
+- Minimal base images (Alpine 40MB vs Ubuntu 77MB)
+
+---
+
+Q7. GOOGLE - Dockerfile Optimization for Node.js Applications
+================================================================================
+Question:
+Create an optimized Dockerfile for a Node.js app that reduces image size and 
+build time. Include npm caching strategy.
+
+Answer:
+Practical Solution:
+
+OPTIMIZED Node.js Dockerfile:
+```dockerfile
+# Stage 1: Build stage
+FROM node:16-alpine AS builder
+WORKDIR /build
+
+# Cache package files (won't invalidate on code changes)
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Build application (if TypeScript)
+COPY . .
+RUN npm run build
+
+# Stage 2: Runtime stage (minimal)
+FROM node:16-alpine
+WORKDIR /app
+
+# Security: non-root user
+RUN addgroup -g 1000 nodeapp && \
+    adduser -D -u 1000 -G nodeapp nodeapp
+
+# Copy only necessary files from builder
+COPY --from=builder --chown=nodeapp:nodeapp /build/dist ./dist
+COPY --from=builder --chown=nodeapp:nodeapp /build/node_modules ./node_modules
+COPY --from=builder --chown=nodeapp:nodeapp /build/package*.json ./
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node healthcheck.js
+
+USER nodeapp
+EXPOSE 3000
+CMD ["node", "dist/index.js"]
+```
+
+.dockerignore:
+```
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.local
+.DS_Store
+```
+
+Build Command with Cache:
+```bash
+# First build (slow)
+docker build -t myapp:latest .
+
+# Subsequent builds (fast) - uses layer cache
+docker build -t myapp:latest .
+
+# Force rebuild without cache
+docker build --no-cache -t myapp:latest .
+
+# Multi-stage build with proper caching
+docker build --target builder -t myapp:builder .  # Keep builder for intermediate steps
+```
+
+Real-world Result:
+- Image Size: 45MB (vs 280MB without optimization)
+- Build Time: 12s (vs 45s on subsequent builds with cache)
+- Deploy Time: 8s (smaller pull, faster startup)
+
+---
+
+Q8. ACCENTURE - Docker Registry Private vs Public, Image Tagging Strategy
+================================================================================
+Question:
+How do you manage Docker image versions and push to private registries? 
+Show tagging strategy for dev/staging/production.
+
+Answer:
+Practical Solution:
+
+IMAGE TAGGING STRATEGY:
+```bash
+# Build with semantic versioning
+docker build -t myregistry.azurecr.io/myapp:1.2.0 .
+docker build -t myregistry.azurecr.io/myapp:1.2 .
+docker build -t myregistry.azurecr.io/myapp:1 .
+docker build -t myregistry.azurecr.io/myapp:latest .
+
+# Push specific version to registry
+docker push myregistry.azurecr.io/myapp:1.2.0
+docker push myregistry.azurecr.io/myapp:latest
+
+# Tag for CI/CD pipeline
+docker tag myapp:latest myregistry.azurecr.io/myapp:dev-$GIT_COMMIT
+docker tag myapp:latest myregistry.azurecr.io/myapp:staging-1.2.0
+docker tag myapp:latest myregistry.azurecr.io/myapp:prod-1.2.0
+```
+
+PRIVATE REGISTRY WITH AUTHENTICATION:
+```bash
+# Login to Azure Container Registry
+az acr login --name myregistry
+
+# Or Docker Hub private
+docker login -u username -p password
+
+# Login to private registry
+docker login myregistry.azurecr.io \
+  --username <username> \
+  --password <password>
+
+# Push to private registry
+docker push myregistry.azurecr.io/myapp:1.0.0
+
+# Pull from private registry
+docker pull myregistry.azurecr.io/myapp:1.0.0
+```
+
+ENVIRONMENT-SPECIFIC TAGGING:
+```bash
+#!/bin/bash
+# build-and-push.sh - CI/CD pipeline script
+
+VERSION=$(cat version.txt)
+GIT_COMMIT=$(git rev-parse --short HEAD)
+REGISTRY="myregistry.azurecr.io"
+IMAGE_NAME="myapp"
+
+# Build image
+docker build -t $REGISTRY/$IMAGE_NAME:$VERSION \
+             -t $REGISTRY/$IMAGE_NAME:$GIT_COMMIT \
+             -t $REGISTRY/$IMAGE_NAME:latest .
+
+# Push to dev
+if [ "$BRANCH" == "develop" ]; then
+  docker push $REGISTRY/$IMAGE_NAME:dev-$VERSION
+  docker push $REGISTRY/$IMAGE_NAME:dev-$GIT_COMMIT
+fi
+
+# Push to staging
+if [ "$BRANCH" == "staging" ]; then
+  docker push $REGISTRY/$IMAGE_NAME:staging-$VERSION
+fi
+
+# Push to production
+if [ "$BRANCH" == "main" ]; then
+  docker push $REGISTRY/$IMAGE_NAME:$VERSION
+  docker push $REGISTRY/$IMAGE_NAME:$VERSION-$GIT_COMMIT
+  docker push $REGISTRY/$IMAGE_NAME:latest
+fi
+```
+
+Real-world Scenario:
+Version 1.2.0 deployment went wrong → Immediately rollback to 1.1.5:
+```bash
+docker pull myregistry.azurecr.io/myapp:1.1.5
+docker tag myregistry.azurecr.io/myapp:1.1.5 myapp:running
+docker run -d --restart always myapp:running
+```
+
+================================================================================
+KUBERNETES INTERVIEW QUESTIONS (11-20)
+================================================================================
+
+Q11. GOOGLE - Kubernetes Pod Lifecycle & init Containers
+================================================================================
+Question:
+Explain Pod lifecycle stages. What are init containers and when would you use them?
+Show a practical example with waiting for dependencies.
+
+Answer:
+POD LIFECYCLE STAGES:
+1. Pending: Pod created, waiting for resources/scheduling
+2. Running: At least one container running
+3. Succeeded: All containers finished successfully
+4. Failed: At least one container failed
+5. Unknown: State cannot be determined
+
+INIT CONTAINERS:
+- Run before main application containers
+- Must complete successfully before app containers start
+- Useful for setup, migrations, dependency checks
+- Multiple init containers run sequentially
+
+Practical Solution:
+
+Pod with init Container (Waiting for Database):
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+spec:
+  initContainers:
+  - name: wait-for-db
+    image: busybox:1.28
+    command: 
+      - 'sh'
+      - '-c'
+      - |
+        until nc -z mysql-service 3306; do
+          echo "Waiting for MySQL..."
+          sleep 2
+        done
+        echo "MySQL is ready!"
+    
+  - name: db-migration
+    image: myapp:1.0
+    command: ["flask", "db", "upgrade"]
+    env:
+    - name: DATABASE_URL
+      value: "mysql://user:pass@mysql-service:3306/appdb"
+
+  containers:
+  - name: app
+    image: myapp:1.0
+    ports:
+    - containerPort: 8000
+    env:
+    - name: DATABASE_URL
+      value: "mysql://user:pass@mysql-service:3306/appdb"
+```
+
+Complex Multi-stage Init Containers:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      initContainers:
+      
+      # Step 1: Wait for database
+      - name: wait-db
+        image: busybox:1.28
+        command: ['sh', '-c', 'until nc -z mysql:3306; do sleep 1; done']
+      
+      # Step 2: Wait for Redis cache
+      - name: wait-cache
+        image: busybox:1.28
+        command: ['sh', '-c', 'until nc -z redis:6379; do sleep 1; done']
+      
+      # Step 3: Run database migrations
+      - name: migrate
+        image: myapp:1.0
+        command: ["python", "manage.py", "migrate"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: url
+      
+      # Step 4: Seed initial data
+      - name: seed-data
+        image: myapp:1.0
+        command: ["python", "manage.py", "seed_initial_data"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: url
+
+      containers:
+      - name: app
+        image: myapp:1.0
+        ports:
+        - containerPort: 8000
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+```
+
+Monitoring Pod Lifecycle:
+```bash
+# Watch pod creation process
+kubectl get pods -w
+
+# Watch specific pod
+kubectl describe pod myapp-pod
+
+# View init container logs
+kubectl logs myapp-pod -c wait-for-db
+
+# View main container logs
+kubectl logs myapp-pod -c app
+
+# Get pod events (useful for debugging failures)
+kubectl describe pod myapp-pod | grep -A 10 Events
+```
+
+Real-world Scenario:
+Container starts before database is ready → connection fails → pod crashes
+Solution: init container waits for database port to be open before main app starts
+
+---
+
+Q12. WIPRO - Kubernetes Deployment Strategies (Rolling, Blue-Green, Canary)
+================================================================================
+Question:
+Compare rolling update, blue-green, and canary deployment strategies. 
+Which is best for zero-downtime production deployments?
+
+Answer:
+DEPLOYMENT STRATEGIES:
+
+1. ROLLING UPDATE (Default Kubernetes)
+   - Gradually replaces old pods with new version
+   - No downtime, but old and new versions coexist
+   - Slower than blue-green, faster than canary
+
+2. BLUE-GREEN
+   - Run two identical production environments
+   - Blue = current version, Green = new version
+   - Switch traffic instantly
+   - Expensive (2x resources), but instant rollback
+
+3. CANARY
+   - Gradually shift traffic to new version
+   - 5% traffic to new version first, monitor
+   - Slow rollout, catch issues early
+   - Best for critical production systems
+
+Practical Solution:
+
+ROLLING UPDATE (Default):
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # Max 1 extra pod during update
+      maxUnavailable: 0    # 0 pods down at a time (zero-downtime)
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp
+        image: myapp:2.0    # New version
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 2
+```
+
+Apply rolling update:
+```bash
+kubectl apply -f deployment.yaml
+
+# Monitor rollout progress
+kubectl rollout status deployment/myapp
+
+# Watch real-time
+kubectl get pods -w
+
+# Rollback if issues
+kubectl rollout undo deployment/myapp
+
+# View rollout history
+kubectl rollout history deployment/myapp
+```
+
+BLUE-GREEN DEPLOYMENT:
+```bash
+# Current production (Blue)
+kubectl apply -f blue-deployment.yaml
+
+# Deploy new version (Green) alongside
+kubectl apply -f green-deployment.yaml
+
+# Switch service to point to Green
+kubectl patch service myapp -p '{"spec":{"selector":{"version":"green"}}}'
+
+# If issues, switch back instantly
+kubectl patch service myapp -p '{"spec":{"selector":{"version":"blue"}}}'
+
+# Clean up Blue after validation
+kubectl delete deployment myapp-blue
+```
+
+blue-deployment.yaml:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: blue
+    spec:
+      containers:
+      - name: myapp
+        image: myapp:1.0  # Current version
+```
+
+green-deployment.yaml:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+      version: green
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: green
+    spec:
+      containers:
+      - name: myapp
+        image: myapp:2.0  # New version
+```
+
+service.yaml (points to Blue initially):
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp
+spec:
+  selector:
+    app: myapp
+    version: blue
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+```
+
+CANARY DEPLOYMENT (Using Istio):
+```yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: myapp
+spec:
+  hosts:
+  - myapp.example.com
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: myapp-v1
+      weight: 95        # 95% traffic to v1 (stable)
+    - destination:
+        host: myapp-v2
+      weight: 5         # 5% traffic to v2 (canary)
+  timeout: 30s
+  retries:
+    attempts: 3
+```
+
+Monitor Canary:
+```bash
+# Watch metrics
+kubectl top pods -l app=myapp
+
+# Check error rates
+kubectl logs -f deployment/myapp-v2 | grep -i error
+
+# If v2 looks good, gradually shift traffic
+# 5% → 25% → 50% → 100%
+```
+
+Comparison:
+- Rolling Update: Default, balanced, moderate risk
+- Blue-Green: Instant switch, expensive, zero risk
+- Canary: Safest for critical systems, slower
+
+Real-world Incident:
+New deployment had memory leak. Canary deployment caught it at 5% traffic. 
+Rolled back instantly, old version still handled 95% traffic = no customer impact
+
+---
+
+Q13. CTS - Kubernetes Resource Requests and Limits
+================================================================================
+Question:
+Explain resource requests and limits. What happens if container exceeds memory limit?
+How do you calculate CPU and memory requirements?
+
+Answer:
+RESOURCE MANAGEMENT:
+
+Requests: Minimum resources guaranteed
+Limits: Maximum resources allowed
+QoS Classes: Guaranteed, Burstable, BestEffort
+
+Practical Solution:
+
+Pod with Resource Requests and Limits:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp
+spec:
+  containers:
+  - name: myapp
+    image: myapp:1.0
+    resources:
+      requests:
+        memory: "256Mi"   # Guaranteed 256MB RAM
+        cpu: "250m"       # Guaranteed 0.25 CPU cores
+      limits:
+        memory: "512Mi"   # Max 512MB RAM (OOMKilled if exceeded)
+        cpu: "500m"       # Max 0.5 CPU cores
+```
+
+WHAT HAPPENS ON EXCEEDED LIMITS:
+- CPU Limit Exceeded: Container throttled (slowed down), not killed
+- Memory Limit Exceeded: Pod OOMKilled (Out of Memory), restarted
+
+Example Memory Leak:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: memory-leak-app
+spec:
+  containers:
+  - name: app
+    image: buggy-app:1.0
+    resources:
+      requests:
+        memory: "256Mi"
+      limits:
+        memory: "512Mi"   # Leak reaches 512MB → Pod killed
+    livenessProbe:
+      exec:
+        command:
+        - /healthcheck.sh
+      initialDelaySeconds: 10
+      periodSeconds: 30
+```
+
+Monitor resource usage:
+```bash
+# View resource usage
+kubectl top pods
+
+# View detailed resource usage
+kubectl top nodes
+
+# Check pod resource requests vs actual
+kubectl describe pod myapp | grep -A 5 "Limits\|Requests"
+
+# Get all pods with resource info
+kubectl get pods --all-namespaces -o \
+  custom-columns=NAME:.metadata.name,MEM_REQ:.spec.containers[*].resources.requests.memory,\
+  MEM_LIMIT:.spec.containers[*].resources.limits.memory,\
+  CPU_REQ:.spec.containers[*].resources.requests.cpu,\
+  CPU_LIMIT:.spec.containers[*].resources.limits.cpu
+
+# Check which pod was OOMKilled
+kubectl describe pod memory-leak-app | grep -i "reason\|message"
+```
+
+CALCULATE RESOURCE REQUIREMENTS:
+```
+Step 1: Run load test in Docker locally
+docker run -d --memory="512m" --cpus="1" myapp:1.0
+
+# Measure peak usage during normal load
+docker stats
+
+# Peak memory: 450MB (use 512MB request, 1GB limit)
+# Average CPU: 300m (use 300m request, 600m limit)
+
+Step 2: Set as initial values
+memory request = peak * 1.1
+memory limit = peak * 2
+
+cpu request = average * 1.2
+cpu limit = average * 2
+```
+
+DEPLOYMENT WITH RIGHT-SIZING:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      
+      - name: logging-sidecar
+        image: fluentd:v1
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+```
+
+Pod Disruption Budget (Prevent node drain issues):
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: myapp-pdb
+spec:
+  minAvailable: 2       # Keep minimum 2 pods running during drain
+  selector:
+    matchLabels:
+      app: myapp
+```
+
+Real-world Scenario:
+- Without limits: One container crashes, hogs all memory, kills entire node
+- With limits: Container killed gracefully, other pods unaffected
+- Without requests: Pods scheduled on full nodes, fail immediately
+
+---
+
+Q14. TCS - Kubernetes StatefulSets vs Deployments
+================================================================================
+Question:
+When do you use StatefulSet vs Deployment? Show example of deploying 
+databases, message queues, and how persistent ordering matters.
+
+Answer:
+STATEFULSETS vs DEPLOYMENTS:
+
+Deployment (Stateless):
+- Pods are interchangeable
+- No guaranteed ordering
+- Perfect for web services, APIs, workers
+- Example: Nginx, Flask app, microservices
+
+StatefulSet (Stateful):
+- Each pod has unique identity
+- Ordered creation/deletion (pod-0, pod-1, pod-2)
+- Stable network identity
+- Persistent storage per pod
+- Example: Databases (MySQL, PostgreSQL), Kafka, Elasticsearch
+
+Practical Solution:
+
+DEPLOYMENT (Stateless Web Service):
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-api
+  template:
+    metadata:
+      labels:
+        app: web-api
+    spec:
+      containers:
+      - name: api
+        image: myapi:1.0
+        ports:
+        - containerPort: 8000
+```
+
+STATEFULSET (Database - MySQL):
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  serviceName: mysql-service    # Headless service name
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+  
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# Headless service (no load balancing, DNS resolution)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  clusterIP: None          # Headless service
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306
+```
+
+Accessing StatefulSet Members:
+```bash
+# Pod names are predictable: mysql-0, mysql-1, mysql-2
+
+# Connect to specific pod
+kubectl exec -it mysql-0 -- mysql -u root -p
+
+# DNS name of specific pod
+mysql-0.mysql-service.default.svc.cluster.local
+
+# In application code (Python):
+import mysql.connector
+
+# Connect to primary (mysql-0)
+conn = mysql.connector.connect(
+    host="mysql-0.mysql-service.default.svc.cluster.local",
+    user="root",
+    password="password",
+    database="mydb"
+)
+```
+
+STATEFULSET (Kafka Message Queue):
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+spec:
+  serviceName: kafka-service
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+      - name: kafka
+        image: confluentinc/cp-kafka:7.0.0
+        ports:
+        - containerPort: 9092
+        env:
+        - name: KAFKA_BROKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+              # This creates: kafka-0 → ID=0, kafka-1 → ID=1, kafka-2 → ID=2
+        - name: KAFKA_ZOOKEEPER_CONNECT
+          value: zookeeper-0.zookeeper-service:2181
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: PLAINTEXT://$(POD_NAME).kafka-service:9092
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /var/lib/kafka
+  
+  volumeClaimTemplates:
+  - metadata:
+      name: kafka-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 20Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+spec:
+  clusterIP: None
+  selector:
+    app: kafka
+  ports:
+  - port: 9092
+    targetPort: 9092
+```
+
+KEY DIFFERENCES:
+
+Deployment Example:
+```bash
+kubectl scale deployment web-api --replicas=5
+# Pods: web-api-xyz, web-api-abc, web-api-def (random names, interchangeable)
+
+kubectl delete pod web-api-xyz
+# New pod created with different name, no impact
+```
+
+StatefulSet Example:
+```bash
+kubectl scale statefulset mysql --replicas=5
+# Pods: mysql-0, mysql-1, mysql-2, mysql-3, mysql-4 (ordered)
+
+kubectl delete pod mysql-2
+# mysql-2 recreated with SAME NAME and SAME STORAGE
+# mysql-0 and mysql-1 unchanged until mysql-2 comes online
+
+# Deletion order: mysql-4 → mysql-3 → mysql-2 → mysql-1 → mysql-0 (reverse)
+```
+
+Real-world Scenario:
+Stateless pod (web-api): Kill any pod, traffic load-balances to others instantly
+Stateful pod (MySQL): Kill pod-1, cluster rebuilds that node from replicated data before accepting new queries
+
+---
+
+Q15. GOOGLE - Kubernetes Horizontal Pod Autoscaler (HPA)
+================================================================================
+Question:
+How do you implement auto-scaling in Kubernetes based on CPU and custom metrics?
+Show HPA configuration and how to use custom metrics from Prometheus.
+
+Answer:
+HORIZONTAL POD AUTOSCALER (HPA):
+- Automatically scales pod replicas based on metrics
+- Requires Metrics Server for CPU/memory metrics
+- Custom metrics via Prometheus
+- Scales: min replicas → max replicas based on thresholds
+
+Practical Solution:
+
+INSTALL METRICS SERVER (Required for HPA):
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# Verify installation
+kubectl get deployment metrics-server -n kube-system
+```
+
+HPA BASED ON CPU:
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-api
+  minReplicas: 2        # Minimum pods
+  maxReplicas: 10       # Maximum pods
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70    # Scale up if avg CPU > 70%
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80    # Scale up if avg memory > 80%
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 min before scale down
+      policies:
+      - type: Percent
+        value: 50                      # Remove 50% of pods
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0    # Scale up immediately
+      policies:
+      - type: Percent
+        value: 100                     # Double pods
+        periodSeconds: 15
+```
+
+DEPLOYMENT WITH RESOURCE REQUESTS (Required for HPA):
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-api
+  template:
+    metadata:
+      labels:
+        app: web-api
+    spec:
+      containers:
+      - name: api
+        image: myapi:1.0
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "500m"              # HPA uses requests as baseline
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+```
+
+Monitor HPA:
+```bash
+# Watch HPA status
+kubectl get hpa -w
+
+# Detailed HPA info
+kubectl describe hpa web-api-hpa
+
+# View scaling events
+kubectl get events --sort-by='.lastTimestamp'
+
+# Simulate load test
+kubectl run -i --tty load-generator --rm --image=busybox --restart=Never -- /bin/sh
+# Inside the shell:
+while true; do wget -q -O- http://web-api/api/heavy-computation; done
+```
+
+HPA WITH CUSTOM METRICS (Prometheus):
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-hpa-custom
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-api
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  
+  # Standard metric: CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  
+  # Custom metric: Request latency from Prometheus
+  - type: Pods
+    pods:
+      metric:
+        name: http_request_duration_seconds
+        selector:
+          matchLabels:
+            quantile: "0.95"    # 95th percentile latency
+      target:
+        type: AverageValue
+        averageValue: "100m"    # Scale if avg latency > 100ms
+  
+  # Custom metric: Message queue depth
+  - type: External
+    external:
+      metric:
+        name: kafka_topic_lag
+        selector:
+          matchLabels:
+            topic: events
+      target:
+        type: AverageValue
+        averageValue: "1000"    # Scale if avg lag > 1000 messages
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+```
+
+PROMETHEUS SETUP FOR CUSTOM METRICS:
+```yaml
+# Service to expose Prometheus
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - port: 9090
+    targetPort: 9090
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+    - job_name: 'kubernetes-pods'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+```
+
+APPLICATION METRICS (Python example):
+```python
+from prometheus_client import Counter, Histogram, start_http_server
+import time
+
+# Metrics
+request_count = Counter(
+    'http_requests_total', 
+    'Total HTTP requests', 
+    ['method', 'endpoint']
+)
+
+request_duration = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request latency',
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0]
+)
+
+# Start metrics server on port 8001
+start_http_server(8001)
+
+# In Flask app
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/api/data')
+@request_duration.time()
+def get_data():
+    request_count.labels(method='GET', endpoint='/api/data').inc()
+    # Actual logic here
+    return {"data": "value"}
+```
+
+Real-world Scenario:
+E-commerce website: Traffic spike 10x during sale
+- Without HPA: Overloaded servers, timeouts, dropped requests
+- With HPA: Automatically scales from 2 pods to 20, maintains performance
+
+---
+
+Q16. ACCENTURE - Kubernetes Service Discovery & DNS
+================================================================================
+Question:
+Explain how service discovery works in Kubernetes. How do containers find 
+each other? Show internal and external access patterns.
+
+Answer:
+SERVICE DISCOVERY IN KUBERNETES:
+
+Internal (Cluster):
+- Service DNS names: servicename.namespace.svc.cluster.local
+- Kube-dns resolves service names to ClusterIP
+- Pod-to-pod communication via service DNS
+
+External (Outside Cluster):
+- Ingress: Layer 7 (HTTP/HTTPS) routing
+- LoadBalancer: Layer 4 routing
+- NodePort: Expose on node ports
+
+Practical Solution:
+
+CLUSTERIP SERVICE (Internal only):
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: production
+spec:
+  type: ClusterIP              # Default, internal only
+  selector:
+    app: backend
+  ports:
+  - port: 8000                 # Service port (internal)
+    targetPort: 8000           # Container port
+    name: http
+```
+
+From any pod in the cluster:
+```bash
+# Full DNS: backend-service.production.svc.cluster.local:8000
+# Short DNS (same namespace): backend-service:8000
+
+# Example in Python
+import requests
+response = requests.get("http://backend-service:8000/api/data")
+```
+
+NODEPORT SERVICE (External access):
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: api
+  ports:
+  - port: 80               # Service port (internal)
+    targetPort: 8000       # Container port
+    nodePort: 30080        # Node port (external), range 30000-32767
+```
+
+Access from outside cluster:
+```bash
+# On any node: http://node-ip:30080
+kubectl get nodes -o wide    # Get node IPs
+# If node IP is 10.0.0.5, access: http://10.0.0.5:30080
+```
+
+LOADBALANCER SERVICE (Cloud provider):
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: api
+  ports:
+  - port: 80
+    targetPort: 8000
+```
+
+Automatically assigns external IP (AWS ELB):
+```bash
+kubectl get svc api-loadbalancer
+# NAME                TYPE           CLUSTER-IP       EXTERNAL-IP
+# api-loadbalancer    LoadBalancer   10.0.1.100       a1b2c3.us-east-1.elb.amazonaws.com
+# Access from anywhere: http://a1b2c3.us-east-1.elb.amazonaws.com
+```
+
+INGRESS (Layer 7 HTTP routing):
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-service
+            port:
+              number: 8000
+  - host: admin.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-service
+            port:
+              number: 9000
+  tls:
+  - hosts:
+    - api.example.com
+    - admin.example.com
+    secretName: api-tls-cert
+```
+
+COMPLEX MULTI-TIER APPLICATION:
+```yaml
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: LoadBalancer
+  selector:
+    tier: frontend
+  ports:
+  - port: 80
+    targetPort: 3000
+
+---
+# Backend Service (internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    tier: backend
+  ports:
+  - port: 8000
+    targetPort: 8000
+
+---
+# Database Service (internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+spec:
+  type: ClusterIP
+  clusterIP: None         # Headless service for StatefulSet
+  selector:
+    tier: database
+  ports:
+  - port: 5432
+    targetPort: 5432
+
+---
+# Frontend Deployment (accesses backend via service DNS)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        tier: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: myapp-frontend:1.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: BACKEND_URL
+          value: "http://backend-service:8000"  # Service DNS
+
+---
+# Backend Deployment (accesses database via service DNS)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      tier: backend
+  template:
+    metadata:
+      labels:
+        tier: backend
+    spec:
+      containers:
+      - name: backend
+        image: myapp-backend:1.0
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://user:pass@postgres-service:5432/mydb"
+```
+
+DNS Resolution Check:
+```bash
+# Inside any pod
+kubectl exec -it pod-name -- sh
+
+# Test DNS resolution
+nslookup backend-service
+# Output shows ClusterIP: 10.0.1.100
+
+# Test connectivity
+curl http://backend-service:8000
+
+# Check /etc/resolv.conf
+cat /etc/resolv.conf
+# nameserver 10.0.0.10  (kube-dns)
+# search default.svc.cluster.local
+```
+
+Real-world Service Discovery Flow:
+1. Pod makes request to "backend-service"
+2. kubelet's DNS resolver (kube-dns) intercepts
+3. Resolves to ClusterIP: 10.0.1.100
+4. kube-proxy routes traffic to backend pod (iptables rules)
+5. Request arrives at backend pod
+
+---
+
+Q17. WIPRO - Kubernetes ConfigMaps and Secrets Management
+================================================================================
+Question:
+How do you manage configuration and secrets in Kubernetes? Compare ConfigMap 
+vs Secrets. Show how to inject credentials safely without hardcoding.
+
+Answer:
+CONFIGMAPS vs SECRETS:
+
+ConfigMap:
+- Store non-sensitive configuration (strings, JSON, YAML)
+- Readable in etcd, not encrypted by default
+- Max 1MB size
+- Use for: app config, feature flags, URLs
+
+Secrets:
+- Store sensitive data (API keys, passwords, certificates)
+- Base64 encoded, encrypted in etcd (enable encryption)
+- Max 1MB size
+- Use for: passwords, tokens, TLS certs
+
+Practical Solution:
+
+CONFIGMAP (Ap... (24 KB left)
